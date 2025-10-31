@@ -1,0 +1,508 @@
+{
+  "Epithelial Cell": {
+    "definition": "Cells lining the surfaces of the lung, including airways and alveoli, responsible for barrier function, gas exchange, and mucociliary clearance.",
+    "children": {
+      "Airway Epithelium": {
+        "definition": "The pseudostratified epithelium of the conducting airways, from the trachea to the terminal bronchioles.",
+        "children": {
+          "Basal Cell": {
+            "definition": "The primary stem cell of the proximal airways, responsible for self-renewal and differentiation into other luminal cell types.",
+            "children": {
+              "Suprabasal Cell": {
+                "definition": "A transient, intermediate cell state migrating from the basal layer and committed to differentiation.",
+                "children": {}
+              },
+              "Secretory-Primed Basal Cell": {
+                "definition": "A subpopulation of basal cells molecularly primed to assume secretory cell fates.",
+                "children": {}
+              },
+              "Cycling Basal Cell": {
+                "definition": "Basal cells undergoing active proliferation.",
+                "children": {}
+              }
+            }
+          },
+          "Secretory Cell": {
+            "definition": "Cells responsible for producing the protective airway mucus layer.",
+            "children": {
+              "Club Cell": {
+                "definition": "The primary secretory cell of the smaller bronchioles, producing secretoglobins.",
+                "children": {}
+              },
+              "Goblet Cell": {
+                "definition": "The primary mucin-producing cell (MUC5AC+) of the larger airways.",
+                "children": {}
+              },
+              "Nasal Secretory Cell": {
+                "definition": "A secretory cell population in the nasal epithelium, molecularly distinct from tracheobronchial secretory cells.",
+                "children": {}
+              }
+            }
+          },
+          "Ciliated Cell": {
+            "definition": "Terminally differentiated cells responsible for mucociliary clearance via motile cilia.",
+            "children": {
+              "Deuterosomal Cell": {
+                "definition": "A transient precursor state to a mature ciliated cell, characterized by massive centriole amplification.",
+                "children": {}
+              },
+              "Mature Ciliated Cell": {
+                "definition": "The functional, motile ciliated cell responsible for mucus transport.",
+                "children": {}
+              }
+            }
+          },
+          "Rare Airway Epithelial Cells": {
+            "definition": "A group of low-abundance cells with critical sensory and regulatory functions.",
+            "children": {
+              "Ionocyte": {
+                "definition": "A rare cell type identified as the primary site of CFTR expression, regulating ion and fluid balance.",
+                "children": {}
+              },
+              "Tuft Cell": {
+                "definition": "A chemosensory cell that initiates type 2 immune responses in the airway.",
+                "children": {
+                  "Tuft-1 Cell": {
+                    "definition": "A distinct molecular subtype of Tuft cell.",
+                    "children": {}
+                  },
+                  "Tuft-2 Cell": {
+                    "definition": "A distinct molecular subtype of Tuft cell.",
+                    "children": {}
+                  },
+                  "Basal/Tuft Hybrid Cell": {
+                    "definition": "A likely progenitor state with features of both Basal and Tuft cells.",
+                    "children": {}
+                  }
+                }
+              },
+              "Pulmonary Neuroendocrine Cell": {
+                "definition": "Sensory cells (PNEC) that release neuropeptides in response to airway stimuli, often clustered in Neuroepithelial Bodies (NEBs).",
+                "children": {}
+              },
+              "Hillock Cell": {
+                "definition": "A novel epithelial population associated with dividing cells in the airways.",
+                "children": {}
+              }
+            }
+          }
+        }
+      },
+      "Submucosal Gland Epithelium": {
+        "definition": "Epithelial cells of the glands located deep within the walls of the trachea and large bronchi.",
+        "children": {
+          "SMG Mucous Cell": {
+            "definition": "The primary MUC5B-producing mucin cell of the submucosal glands.",
+            "children": {}
+          },
+          "SMG Serous Cell": {
+            "definition": "A submucosal gland cell that secretes antimicrobial proteins, including lysozyme and lactoferrin.",
+            "children": {}
+          },
+          "SMG Duct Cell": {
+            "definition": "Epithelial cell forming the duct that transports gland secretions to the airway surface.",
+            "children": {}
+          },
+          "SMG Myoepithelial Cell": {
+            "definition": "A basal, contractile cell surrounding the submucosal gland acini, responsible for expelling secretions.",
+            "children": {}
+          }
+        }
+      },
+      "Alveolar Epithelium": {
+        "definition": "The epithelial lining of the distal gas-exchange region (the alveoli).",
+        "children": {
+          "Alveolar Type 1 Cell": {
+            "definition": "The extremely thin, large squamous cell (AT1) that covers ~95% of the alveolar surface and is the primary site of gas exchange.",
+            "children": {}
+          },
+          "Alveolar Type 2 Cell": {
+            "definition": "The cuboidal cell (AT2) responsible for producing pulmonary surfactant and serving as the primary progenitor of the alveolus.",
+            "children": {
+              "Alveolar Epithelial Progenitor": {
+                "definition": "A functionally distinct subset of AT2 cells (AEP), often Wnt-responsive, that serves as the principal homeostatic stem cell.",
+                "children": {}
+              },
+              "Mature AT2 Cell": {
+                  "definition": "The terminally differentiated AT2 cell, primarily responsible for surfactant production.",
+                  "children": {}
+              }
+            }
+          },
+          "Transitional Alveolar Epithelial Cell": {
+            "definition": "Transient cell states representing the differentiation trajectory from AT2 to AT1 cells, especially after injury.",
+            "children": {
+              "KRT8+ Transitional Epithelial Cell": {
+                "definition": "A consensus damage-associated transient progenitor state (DATP or PATS) implicated in regeneration and fibrosis.",
+                "children": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "Immune Cell": {
+    "definition": "Cells of the immune system residing in or trafficking through the lung.",
+    "children": {
+      "Myeloid Cell": {
+        "definition": "Innate immune cells, including macrophages, dendritic cells, and monocytes.",
+        "children": {
+          "Macrophage": {
+            "definition": "The most abundant immune cell in the lung, responsible for phagocytosis and immune regulation.",
+            "children": {
+              "Alveolar Macrophage": {
+                "definition": "Resident macrophages of the alveolar airspace (lumen).",
+                "children": {
+                  "IGF1+ Alveolar Macrophage": {
+                    "definition": "A functional subcluster of alveolar macrophages.",
+                    "children": {}
+                  },
+                  "CCL18+ Alveolar Macrophage": {
+                    "definition": "A functional subcluster of alveolar macrophages.",
+                    "children": {}
+                  },
+                  "CXCL5+ Alveolar Macrophage": {
+                    "definition": "A functional subcluster of alveolar macrophages.",
+                    "children": {}
+                  },
+                  "Cholesterol-biosynthesis Alveolar Macrophage": {
+                    "definition": "A functional subcluster of alveolar macrophages defined by cholesterol metabolism genes.",
+                    "children": {}
+                  },
+                  "Chemokine-defined Alveolar Macrophage": {
+                    "definition": "A functional subcluster of alveolar macrophages defined by chemokine expression.",
+                    "children": {}
+                  },
+                  "Metallothionein-defined Alveolar Macrophage": {
+                    "definition": "A functional subcluster of alveolar macrophages defined by metallothionein expression.",
+                    "children": {}
+                  },
+                  "Interferon-response Alveolar Macrophage": {
+                    "definition": "A functional subcluster of alveolar macrophages in an interferon-activated state.",
+                    "children": {}
+                  },
+                  "Small-cluster Alveolar Macrophage": {
+                    "definition": "A distinct functional subcluster of alveolar macrophages.",
+                    "children": {}
+                  }
+                }
+              },
+              "Interstitial Macrophage": {
+                "definition": "Resident macrophages that reside within the lung tissue (interstitium).",
+                "children": {}
+              }
+            }
+          },
+          "Dendritic Cell": {
+            "definition": "Professional antigen-presenting cells (APCs) responsible for initiating adaptive immune responses.",
+            "children": {
+              "Conventional DC 1": {
+                "definition": "A subtype of conventional dendritic cells (cDC1) specialized in cross-presentation.",
+                "children": {}
+              },
+              "Conventional DC 2": {
+                "definition": "A subtype of conventional dendritic cells (cDC2) specialized in polarizing CD4+ T cells.",
+                "children": {}
+              },
+              "Plasmacytoid DC": {
+                "definition": "A dendritic cell subtype (pDC) specialized in producing large amounts of type I interferon.",
+                "children": {}
+              },
+              "LAMP3+ DC": {
+                "definition": "A mature, migratory state of conventional DCs primed to travel to lymph nodes.",
+                "children": {}
+              }
+            }
+          },
+          "Monocyte": {
+            "definition": "Circulating immune cells recruited from the blood that differentiate into macrophages or DCs.",
+            "children": {
+              "Classical Monocyte": {
+                "definition": "A monocyte subtype (CD14+) typically involved in inflammatory responses.",
+                "children": {}
+              },
+              "Non-classical Monocyte": {
+                "definition": "A monocyte subtype (CD16+) involved in patrolling the endothelium.",
+                "children": {}
+              },
+              "Intermediate Monocyte": {
+                "definition": "A transitional monocyte state between classical and non-classical subtypes.",
+                "children": {}
+              }
+            }
+          },
+          "Granulocyte": {
+            "definition": "Innate immune cells characterized by cytoplasmic granules, including neutrophils, mast cells, eosinophils, and basophils.",
+            "children": {
+              "Mast Cell": {
+                "definition": "A granulocyte involved in allergy and inflammatory responses.",
+                "children": {}
+              },
+              "Neutrophil": {
+                "definition": "A highly abundant, phagocytic granulocyte that is a first responder to infection.",
+                "children": {}
+              },
+              "Eosinophil": {
+                "definition": "A granulocyte primarily involved in responding to parasitic infections and allergic reactions.",
+                "children": {}
+              },
+              "Basophil": {
+                "definition": "A rare granulocyte involved in allergic responses.",
+                "children": {}
+              }
+            }
+          }
+        }
+      },
+      "Lymphoid Cell": {
+        "definition": "Adaptive and innate immune cells, including T cells, B cells, and ILCs.",
+        "children": {
+          "T Cell": {
+            "definition": "A type of lymphocyte that plays a central role in cell-mediated immunity.",
+            "children": {
+              "CD4+ T Cell": {
+                "definition": "Conventional T-helper cells that coordinate immune responses.",
+                "children": {}
+              },
+              "CD8+ T Cell": {
+                "definition": "Cytotoxic T cells that kill infected or malignant cells.",
+                "children": {}
+              },
+              "Regulatory T Cell": {
+                "definition": "A suppressive T cell (Treg) crucial for maintaining immune homeostasis and tolerance.",
+                "children": {}
+              },
+              "Mucosal-Associated Invariant T Cell": {
+                "definition": "An unconventional T cell (MAIT) abundant at mucosal sites like the lung.",
+                "children": {}
+              },
+              "Tissue-Resident Memory T Cell": {
+                "definition": "A non-circulating memory T cell (TRM) that provides long-term local immunity.",
+                "children": {
+                  "AREG+ CD4+ TRM": {
+                    "definition": "A functional subtype of CD4+ TRM involved in tissue repair.",
+                    "children": {}
+                  },
+                  "IFNG+ CD4+ TRM": {
+                    "definition": "A functional subtype of CD4+ TRM with a pro-inflammatory, interferon-producing phenotype.",
+                    "children": {}
+                  }
+                }
+              }
+            }
+          },
+          "B Cell Lineage": {
+            "definition": "Cells mediating humoral (antibody) immunity, including B cells and their terminally differentiated state, Plasma cells.",
+            "children": {
+              "B Cell": {
+                "definition": "Lymphocytes that produce antibodies and present antigens.",
+                "children": {
+                  "Naive B Cell": {
+                    "definition": "A B cell that has not yet been activated by an antigen.",
+                    "children": {}
+                  },
+                  "Memory B Cell": {
+                    "definition": "A long-lived, antigen-experienced B cell capable of a rapid response upon re-infection.",
+                    "children": {}
+                  },
+                  "Regulatory B Cell": {
+                    "definition": "A B cell subset (Breg) with immune-suppressive functions.",
+                    "children": {}
+                  }
+                }
+              },
+              "Plasma Cell": {
+                "definition": "Terminally differentiated B cells that are highly specialized for secreting antibodies.",
+                "children": {}
+              }
+            }
+          },
+          "Innate Lymphoid Cell": {
+            "definition": "Innate lymphocytes (ILCs) that mirror the functions of T-helper cells but lack antigen-specific receptors.",
+            "children": {
+              "ILC1": {
+                "definition": "An innate lymphoid cell that produces IFNG, mirroring Th1 cells.",
+                "children": {}
+              },
+              "ILC2": {
+                "definition": "An innate lymphoid cell that produces Type 2 cytokines (IL-5, IL-13), mirroring Th2 cells.",
+                "children": {
+                  "CRTH2+ ILC2": {
+                      "definition": "Canonical ILC2 population, typically expressing CRTH2.",
+                      "children": {}
+                  },
+                  "CRTH2- ILC2": {
+                    "definition": "A novel ILC2 subpopulation identified in the lung.",
+                    "children": {}
+                  }
+                }
+              },
+              "ILC3": {
+                "definition": "An innate lymphoid cell that produces IL-17/IL-22, mirroring Th17 cells.",
+                "children": {
+                  "NCR+ ILC3": {
+                    "definition": "A subtype of ILC3 expressing natural cytotoxicity receptors (NCR).",
+                    "children": {}
+                  },
+                  "NCR- ILC3": {
+                    "definition": "A subtype of ILC3 lacking natural cytotoxicity receptors (NCR).",
+                    "children": {}
+                  }
+                }
+              }
+            }
+          },
+          "Natural Killer Cell": {
+            "definition": "Cytotoxic innate lymphocytes (NK cells) that target virally infected and cancerous cells.",
+            "children": {
+              "CD56bright NK Cell": {
+                "definition": "A tissue-resident NK cell population, typically less cytotoxic but high in cytokine production.",
+                "children": {}
+              },
+              "CD56dim NK Cell": {
+                "definition": "The dominant cytotoxic NK cell in peripheral blood, also found infiltrating the lung.",
+                "children": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "Mesenchymal Cell": {
+    "definition": "Structural (stromal) cells of the lung, providing the connective tissue framework and niche signaling.",
+    "children": {
+      "Fibroblast": {
+        "definition": "Cells responsible for synthesizing and maintaining the extracellular matrix (ECM).",
+        "children": {
+          "Alveolar Fibroblast": {
+            "definition": "Also known as Lipofibroblast. A fibroblast in the alveolar interstitium containing lipid droplets, critical for supporting AT2 stem cells.",
+            "children": {}
+          },
+          "Adventitial Fibroblast": {
+            "definition": "Fibroblasts located in the adventitia, the connective tissue cuff surrounding airways and blood vessels.",
+            "children": {}
+          },
+          "Matrix Fibroblast": {
+            "definition": "The primary collagen-producing fibroblast responsible for the bulk of the lung's ECM.",
+            "children": {}
+          },
+          "Myofibroblast": {
+            "definition": "A contractile, high-ECM-producing cell rare in healthy lungs but common in fibrosis.",
+            "children": {}
+          }
+        }
+      },
+      "Mural Cell": {
+        "definition": "Contractile cells associated with the walls of airways and the vasculature.",
+        "children": {
+          "Smooth Muscle Cell": {
+            "definition": "Contractile cells that regulate the diameter of airways and blood vessels.",
+            "children": {
+              "Airway Smooth Muscle Cell": {
+                "definition": "Smooth muscle cell surrounding the bronchi and bronchioles, controlling airway caliber.",
+                "children": {}
+              },
+              "Vascular Smooth Muscle Cell": {
+                "definition": "Smooth muscle cell surrounding arteries and veins, controlling vascular tone.",
+                "children": {}
+              }
+            }
+          },
+          "Pericyte": {
+            "definition": "Mural cells embedded in the basement membrane of capillaries and microvessels.",
+            "children": {
+              "Type 1 Pericyte": {
+                "definition": "A quiescent pericyte population associated with capillaries.",
+                "children": {}
+              },
+              "Type 2 Pericyte": {
+                "definition": "An arteriolar-associated, hypoxia-responsive pericyte population.",
+                "children": {}
+              }
+            }
+          }
+        }
+      },
+      "Mesothelial Cell": {
+        "definition": "Specialized cells of mesenchymal origin that form the visceral pleura, the serous membrane lining the outside of the lung.",
+        "children": {}
+      },
+      "Chondrocyte": {
+        "definition": "Cells responsible for maintaining the cartilaginous rings of the trachea and large bronchi.",
+        "children": {}
+      }
+    }
+  },
+  "Endothelial Cell": {
+    "definition": "Cells that form the lining of all blood and lymphatic vessels.",
+    "children": {
+      "Vascular Endothelial Cell": {
+        "definition": "Cells lining the blood vessels (arteries, veins, and capillaries).",
+        "children": {
+          "Arterial Endothelial Cell": {
+            "definition": "Endothelial cells lining the pulmonary arteries.",
+            "children": {}
+          },
+          "Venous Endothelial Cell": {
+            "definition": "Endothelial cells lining the pulmonary veins, distinct from systemic veins.",
+            "children": {
+              "Pulmonary Venous Endothelial Cell": {
+                "definition": "Venous endothelial cells located in the lung parenchyma, part of the main pulmonary circulation.",
+                "children": {}
+              },
+              "Systemic Venous Endothelial Cell": {
+                "definition": "Venous endothelial cells located in the airway walls, part of the systemic (bronchial) circulation.",
+                "children": {}
+              }
+            }
+          },
+          "Capillary Endothelial Cell": {
+            "definition": "The critical interface for gas exchange, resolved into two distinct types.",
+            "children": {
+              "Aerocyte": {
+                "definition": "The definitive gas-exchange endothelial cell (aCap), forming the extremely thin air-blood barrier with AT1 cells.",
+                "children": {}
+              },
+              "General Capillary Cell": {
+                "definition": "A thicker capillary cell (gCap) not specialized for gas exchange; functions as a progenitor and has immune roles.",
+                "children": {}
+              }
+            }
+          }
+        }
+      },
+      "Lymphatic Endothelial Cell": {
+        "definition": "Cells lining the lymphatic drainage vessels, crucial for fluid homeostasis and immune cell trafficking.",
+        "children": {}
+      }
+    }
+  },
+  "Neuronal Cell": {
+    "definition": "Cells of the nervous system that are resident in or innervate the lung.",
+    "children": {
+      "Pulmonary Sensory Neuron": {
+        "definition": "Viscerosensory neurons (nodose-derived) that monitor the internal state of the lung.",
+        "children": {}
+      },
+      "Somatosensory Neuron": {
+        "definition": "Neurons (jugular-derived) involved in somatosensory perception, such as nociception (cough).",
+        "children": {}
+      }
+    }
+  },
+  "Hematopoietic-derived Resident Cell": {
+    "definition": "Non-immune cells of hematopoietic origin that take up long-term residence in the lung.",
+    "children": {
+      "Megakaryocyte": {
+        "definition": "A unique, immune-active population of lung-resident megakaryocytes (MkL) capable of activating T cells.",
+        "children": {}
+      },
+      "Erythroid Cell": {
+        "definition": "Cells of the red blood cell lineage, often captured in lung tissue digests.",
+        "children": {}
+      }
+    }
+  }
+}
