@@ -193,20 +193,12 @@ class CellTypeAnnotationClient:
                     for ann in annotations_to_check:
                         cell_type = ann.get('cell_type_hypotheses', '')
                         
-                        # Extract base cell type (remove modifiers like "Activated", "Proliferating", etc.)
-                        # Check if the cell type is in valid candidates or starts with a modifier
+                        # Check if the cell type is in valid candidates or "Unknown"
                         is_valid = False
                         
                         if cell_type in valid_cell_types:
                             # Direct match
                             is_valid = True
-                        else:
-                            # Check if it's a modified cell type (e.g., "Activated Macrophage")
-                            # by checking if any valid candidate appears in the cell type string
-                            for valid_type in valid_cell_types:
-                                if valid_type != "Unknown" and valid_type in cell_type:
-                                    is_valid = True
-                                    break
                         
                         if not is_valid:
                             raise ValueError(

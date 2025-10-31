@@ -132,7 +132,7 @@ You will be provided with the following data:
 
 ## IMPORTANT NOTES
 * You **MUST NOT** make assumptions beyond the provided data.
-* Your final `cell_type_hypotheses` value **MUST** follow the rules in Step 2.
+* Your final `cell_type_hypotheses` value **MUST** be either an exact string from the `Candidate Cell Types` list or the string "Unknown".
 * You **MUST** follow the annotation rules and output format constraints below without deviation.
 
 ---
@@ -144,22 +144,18 @@ For each cluster provided, you must perform the following steps:
 1.  **Prioritize Strong Markers:** When evaluating marker genes, you **MUST** prioritize genes that have a strong combination of high `logfoldchanges` AND high `pct_diff`. A gene with a high `pct_diff` is highly specific to that cluster.
 
 2.  **Determine Final Cell Type:**
-    * **2a. Find Base Type:** Use `Cluster Marker Genes`, `Cluster Enriched Pathways`, and `Cluster Adjacency` to determine the single best-fitting cell type from the `Candidate Cell Types` JSON. Pathways (e.g., 'T_CELL_RECEPTOR_SIGNALING') should be used as strong confirmation for marker-based identity. Let's call this the `base_cell_type`.
+    * **2a. Evaluate Evidence:** Use `Cluster Marker Genes`, `Cluster Enriched Pathways`, and `Cluster Adjacency` to determine the single best-fitting cell type from the `Candidate Cell Types` JSON. Pathways (e.g., 'T_CELL_RECEPTOR_SIGNALING') should be used as strong confirmation for marker-based identity.
     * **2b. Apply Lineage/Adjacency Rule:** You **MUST** use the `Cluster Adjacency` data as strong evidence. For example, if Cluster X expresses transitional markers (e.g., KRT8) and its adjacency list includes both the parent (e.g., AT2) and child (e.g., AT1) clusters, this strongly supports assigning a "Transitional" cell type *if one exists in the candidate list* (e.g., "KRT8+ Transitional Epithelial Cell").
-    * **2c. Apply Modifier Rule (The Exception):**
-        * Check if the `base_cell_type` you selected has **NO children** listed in the `Candidate Cell Types` JSON.
-        * If, and **ONLY** if, it has **NO children**: Examine `Cluster Enriched Pathways` for strong functional evidence *not* related to base identity (e.g., 'Proliferating', 'Stressed', 'Activated').
-        * If such a state is found, your final `cell_type_hypotheses` is a **new string** prepending the modifier (e.g., "Proliferating [base_cell_type]").
-        * If no state is found, or if the `base_cell_type` *has* children, your final `cell_type_hypotheses` is simply the `base_cell_type` itself.
-    * **2d. Handle Unknown (and Single-Candidate Exception):**
-        * If no candidate cell type can be confidently assigned, you **MUST** label the `cell_type_hypotheses` as "Unknown".
-        * **Single-Candidate Exception:** If the `Candidate Cell Types` list contains only one entry, this rule is critical. Any cluster that does **not** match this single candidate **MUST** be labeled "Unknown". You **MUST** then use the justification to explain that it likely represents the broader parent population, which is not an available annotation option.
+    * **2c. Assign Hypothesis:**
+        * If a best-fitting cell type from the `Candidate Cell Types` list is identified, your final `cell_type_hypotheses` **MUST** be that exact string.
+        * If no candidate cell type can be confidently assigned based on the evidence, you **MUST** label the `cell_type_hypotheses` as "Unknown".
+    * **2d. Handle Single-Candidate Exception:** If the `Candidate Cell Types` list contains only one entry, this rule is critical. Any cluster that does **not** match this single candidate **MUST** be labeled "Unknown". You **MUST** then use the justification to explain that it likely represents the broader parent population, which is not an available annotation option.
 
 3.  **Write Justification:** Your justification must be a concise, scientific explanation.
-    * Cite the key positive marker genes that support your `base_cell_type` conclusion.
-    * You **MAY** also cite key `Cluster Enriched Pathways` if they strongly confirm the `base_cell_type` identity.
-    * You **MUST** also state how the cluster's adjacency (from `cluster_adjacency_json`) supports your conclusion.
-    * If you applied the **Modifier Rule** (2c), you **MUST** cite the key enriched pathways that justify the modifier.
+    * Cite the key positive marker genes that support your `cell_type_hypotheses` conclusion.
+    * You **MAY** also cite key `Cluster Enriched Pathways` if they strongly confirm the cell type identity.
+    * You **MUST** also state how the cluster's adjacency (from `cluster_adjacency_json`) supports your conclusion, if any.
+    * **Cell Status Clarification:** If you observe strong evidence for a specific cell *status* from the `Cluster Enriched Pathways` (e.g., 'Proliferating', 'Stressed', 'Activated'), you **MUST** note this in the justification. This status information **MUST NOT** alter the `cell_type_hypotheses` value.
     * If you applied the **Single-Candidate Exception** (2d), you **MUST** state this in the justification.
     * All cited markers **MUST** be added to the `key_markers_cited` array.
 
@@ -182,17 +178,17 @@ You **MUST** include the all the provided marker genes (from input#4 "Cluster Ma
 [
   {{
     "cluster_id": "0",
-    "cell_type_hypotheses": "Activated Macrophage",
-    "justification": "This cluster is identified as Macrophage based on canonical markers (CD68, MRC1). It is adjacent to other myeloid clusters (Clusters 2, 3). Because 'Macrophage' has no children in the provided list, the 'Activated' modifier is added due to strong enrichment of 'HALLMARK_TNFA_SIGNALING_VIA_NFKB' and 'HALLMARK_INFLAMMATORY_RESPONSE' pathways.",
+    "cell_type_hypotheses": "Macrophage",
+    "justification": "This cluster is identified as Macrophage based on canonical markers (CD68, MRC1) and its adjacency to other myeloid clusters (Clusters 2, 3). Strong enrichment for 'HALLMARK_TNFA_SIGNALING_VIA_NFKB' and 'HALLMARK_INFLAMMATORY_RESPONSE' pathways indicates an activated state, while the core identity remains 'Macrophage'.",
     "key_markers_cited": ["CD68", "MRC1"],
     "confidence": "High",
     "Top_marker_genes": [All marker genes provided for cluster 0, separated by comma],
-    "Top_enriched_pathways": [All pathways provided for cluster 0, separated by
+    "Top_enriched_pathways": [All pathways provided for cluster 0, separated by comma]
   }},
   {{
     "cluster_id": "1",
     "cell_type_hypotheses": "CD4+ T Cell",
-    "justification": "This cluster is identified as T Cell by the expression of CD3D and CD3E, and specifically as CD4+ T Cell by CD4. This identity is strongly confirmed by the 'T_CELL_RECEPTOR_SIGNALING_PATHWAY'. As this cell type has children, no modifiers are added.",
+    "justification": "This cluster is identified as T Cell by the expression of CD3D and CD3E, and specifically as CD4+ T Cell by CD4. This identity is strongly confirmed by the 'T_CELL_RECEPTOR_SIGNALING_PATHWAY'.",
     "key_markers_cited": ["CD3D", "CD3E", "CD4"],
     "confidence": "High",
     "Top_marker_genes": [All marker genes provided for cluster 1, separated by comma],
