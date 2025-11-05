@@ -5,7 +5,7 @@ Cluster analysis utilities including adjacency computation.
 
 from typing import Dict, List
 import scanpy as sc
-
+import pandas as pd
 from .logger import PipelineLogger
 
 logger = PipelineLogger.get_logger(__name__)
@@ -27,14 +27,11 @@ def get_cluster_adjacency(adata: sc.AnnData, cluster_key: str) -> Dict[str, List
     sc.tl.paga(adata, groups=cluster_key)
     
     connectivity_matrix = adata.uns['paga']['connectivities']
-    cluster_names = adata.obs[cluster_key].cat.categories
     
-    adjacency_dict = {}
-    for i, cluster_name in enumerate(cluster_names):
-        # Find the indices of connected clusters in the sparse matrix
-        connected_indices = connectivity_matrix[i].nonzero()[1]
-        neighbor_names = [cluster_names[j] for j in connected_indices]
-        adjacency_dict[str(cluster_name)] = neighbor_names
+    connectivity_matrix = adata.uns['paga']['connectivities'].toarray().round(4)
+    connectivity_matrix = pd.DataFrame(connectivity_matrix, 
+                                       index=adata.obs[cluster_key].cat.categories,
+                                       columns=adata.obs[cluster_key].cat.categories)
+    connectivity_matrix_json = connectivity_matrix.to_dict(orient="split")
     
-    logger.debug(f"Computed adjacency for {len(adjacency_dict)} clusters")
-    return adjacency_dict
+    return connectivity_matrix_json

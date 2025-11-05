@@ -41,6 +41,44 @@ class AnnotationNode:
         
         return result
     
+    def to_flat_dict(self) -> Dict[str, Dict]:
+        """
+        Convert tree to a flat dictionary mapping unique_id -> annotation.
+        
+        Returns:
+            Dictionary where keys are unique_ids and values are annotation objects
+        """
+        flat_dict = {}
+        
+        # First, add unique IDs using the tree structure
+        temp_result = dict(self.data)
+        if 'annotation_response' in temp_result:
+            self._add_unique_ids_and_children(temp_result, self.nametag, self.children)
+        
+        # Now flatten the tree structure
+        def flatten_annotations(annotations: List[Dict], parent_cell_type: str = "Root"):
+            """Recursively flatten annotations and their children."""
+            for annot in annotations:
+                unique_id = annot.get('unique_id', '')
+                if unique_id:
+                    # Create a copy without the 'children' field for the flat structure
+                    flat_annot = {k: v for k, v in annot.items() if k != 'children'}
+                    
+                    # Add parent cell type (passed from the recursion)
+                    flat_annot['parent_cell_type'] = parent_cell_type
+                    
+                    flat_dict[unique_id] = flat_annot
+                    
+                    # Process children recursively, passing this annotation's cell type as parent
+                    if 'children' in annot and annot['children']:
+                        current_cell_type = annot.get('cell_type', 'Unknown')
+                        flatten_annotations(annot['children'], current_cell_type)
+        
+        if 'annotation_response' in temp_result:
+            flatten_annotations(temp_result['annotation_response'], "Root")
+        
+        return flat_dict
+    
     def _add_unique_ids_and_children(self, result: Dict, current_nametag: str, 
                                       child_nodes: List['AnnotationNode'], parent_unique_id: str = ""):
         """
@@ -75,7 +113,7 @@ class AnnotationNode:
             
             # Find parent annotation(s) that match this cell type
             for annotation in result['annotation_response']:
-                if annotation['cell_type_hypotheses'] == child_cell_type:
+                if annotation['cell_type'] == child_cell_type:
                     # This annotation should contain the child's annotations
                     parent_unique_id_for_children = annotation['unique_id']
                     
@@ -332,13 +370,37 @@ def build_hierarchy_level_mapping(tree_json_path: str) -> Dict[str, int]:
     return level_mapping
 
 
-def process_tsv_files(tsv_dir: str, consolidated_data: Dict, output_tsv: str, tree_json_path: str = None):
+def calculate_hierarchy_level_from_unique_id(unique_id: str) -> int:
+    """
+    Calculate the hierarchy level from a unique_id.
+    
+    The unique_id format is like "0", "0.1", "0.1.2", "4.7", etc.
+    The level is the number of dots plus 1 (but we use 0-indexed levels).
+    Actually, the level is simply the number of dots.
+    
+    Args:
+        unique_id: The unique identifier (e.g., "2.0.1" means level 2 in the hierarchy)
+        
+    Returns:
+        The hierarchy level (0-indexed)
+    """
+    if not unique_id or unique_id == '':
+        return 0
+    
+    # Count the number of dots to determine depth
+    # "0" = level 0
+    # "0.1" = level 1
+    # "0.1.2" = level 2
+    return unique_id.count('.')
+
+
+def process_tsv_files(tsv_dir: str, consolidated_data: Dict[str, Dict], output_tsv: str, tree_json_path: str = None):
     """
     Process TSV files to map cell IDs to unique cluster IDs and create combined output.
     
     Args:
         tsv_dir: Directory containing *_subset.tsv files
-        consolidated_data: The consolidated annotation data with unique_ids
+        consolidated_data: Flat dictionary mapping unique_id -> annotation data
         output_tsv: Path to output TSV file
     """
     import pandas as pd
@@ -348,29 +410,20 @@ def process_tsv_files(tsv_dir: str, consolidated_data: Dict, output_tsv: str, tr
     # Build a mapping from (nametag, cluster_id) -> unique_id and annotation
     cluster_mapping = {}
     
-    def extract_mappings(annotations: List[Dict], nametag: str):
-        """Recursively extract cluster mappings from annotations."""
-        for annot in annotations:
-            cluster_id = annot['cluster_id']
-            unique_id = annot['unique_id']
-            cell_type = annot['cell_type_hypotheses']
-            
-            # Store mapping
-            key = (nametag, cluster_id)
+    # Extract mappings from flat consolidated data
+    for unique_id, annot in consolidated_data.items():
+        cluster_id = annot.get('cluster_id', '')
+        cell_type = annot.get('cell_type', '')
+        hierarchy_path = annot.get('hierarchy_path', '')
+        
+        # Store mapping using (hierarchy_path, cluster_id) as key
+        if hierarchy_path and cluster_id:
+            key = (hierarchy_path, cluster_id)
             cluster_mapping[key] = {
                 'unique_id': unique_id,
                 'cell_type': cell_type,
-                'hierarchy_path': annot.get('hierarchy_path', nametag)
+                'hierarchy_path': hierarchy_path
             }
-            
-            # Process children recursively
-            if 'children' in annot and annot['children']:
-                # Children belong to a sub-clustering, need to find their nametag
-                # from the hierarchy_path in the first child
-                if annot['children']:
-                    child_nametag = annot['children'][0].get('hierarchy_path', '')
-                    if child_nametag:
-                        extract_mappings(annot['children'], child_nametag)
     
     # Build hierarchy level mapping from tree JSON if provided
     hierarchy_levels = {}
@@ -378,11 +431,6 @@ def process_tsv_files(tsv_dir: str, consolidated_data: Dict, output_tsv: str, tr
         print(f"  Loading hierarchy levels from: {tree_json_path}")
         hierarchy_levels = build_hierarchy_level_mapping(tree_json_path)
         print(f"  Built hierarchy mapping for {len(hierarchy_levels)} cell types")
-    
-    # Extract mappings from consolidated data
-    if 'annotation_response' in consolidated_data:
-        root_nametag = consolidated_data.get('nametag', 'lev0_all_types')
-        extract_mappings(consolidated_data['annotation_response'], root_nametag)
     
     print(f"  Built mapping for {len(cluster_mapping)} cluster annotations")
     
@@ -438,14 +486,23 @@ def process_tsv_files(tsv_dir: str, consolidated_data: Dict, output_tsv: str, tr
                 hierarchy_path = mapping_info['hierarchy_path']
                 
                 # Determine annotation level
-                if hierarchy_levels and cell_type in hierarchy_levels:
-                    # Use tree-based level mapping
-                    level = hierarchy_levels[cell_type]
-                else:
-                    # Fallback to old method: count underscores after "lev0_" to determine depth
-                    level = hierarchy_path.count('_') - 1  # -1 because lev0_ doesn't count
-                    if hierarchy_path.endswith('_all_types'):
-                        level = 0
+                # The most reliable way is to use the unique_id, which encodes the hierarchy depth
+                level = calculate_hierarchy_level_from_unique_id(unique_id)
+                
+                # Fallback: if unique_id is not available or invalid, try other methods
+                if level is None or level < 0:
+                    if hierarchy_levels and cell_type in hierarchy_levels:
+                        # Use tree-based level mapping
+                        level = hierarchy_levels[cell_type]
+                    else:
+                        # Last resort: use a simple heuristic
+                        # Root level has "_all_types"
+                        if hierarchy_path.endswith('_all_types'):
+                            level = 0
+                        else:
+                            # Count hierarchy segments by finding known cell types in the path
+                            # This is a rough estimate
+                            level = 1
                 
                 # Store in cell_annotations
                 if cell_id not in cell_annotations:
@@ -585,9 +642,9 @@ def main():
     print(f"      ✓ Root node: {root.nametag}")
     print(f"      ✓ Total nodes in tree: {len(annotation_data)}")
     
-    # Convert tree to dictionary
-    print("\n[3/4] Converting tree to hierarchical dictionary...")
-    consolidated_data = root.to_dict()
+    # Convert tree to flat dictionary
+    print("\n[3/4] Converting tree to flat dictionary...")
+    consolidated_data_flat = root.to_flat_dict()
     
     # Create output directory if it doesn't exist
     output_path = Path(args.output_json)
@@ -597,12 +654,12 @@ def main():
     print(f"      ✓ Writing consolidated annotations to: {args.output_json}")
     with open(args.output_json, 'w') as f:
         if args.pretty:
-            json.dump(consolidated_data, f, indent=2)
+            json.dump(consolidated_data_flat, f, indent=2)
         else:
-            json.dump(consolidated_data, f)
+            json.dump(consolidated_data_flat, f)
     
-    total_clusters = len(consolidated_data.get('annotation_response', []))
-    print(f"      ✓ Total root clusters: {total_clusters}")
+    total_clusters = len(consolidated_data_flat)
+    print(f"      ✓ Total annotations: {total_clusters}")
     
     # Process TSV files
     print(f"\n[4/4] Processing TSV files from: {args.data_dir}")
@@ -611,7 +668,7 @@ def main():
         print("Skipping TSV processing.")
         return 1
     
-    process_tsv_files(args.data_dir, consolidated_data, args.output_tsv, args.tree_json)
+    process_tsv_files(args.data_dir, consolidated_data_flat, args.output_tsv, args.tree_json)
     
     print("\n" + "="*80)
     print("✓ Aggregation complete!")

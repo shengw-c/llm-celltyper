@@ -83,6 +83,9 @@ def get_top_marker_genes(
     final_gene_dict1 = {}
     cols_to_keep = ['names', 'logfoldchanges', 'pvals_adj', 'pct_in']
 
+    ## round float values for cleaner output
+    top_genes_df1[["logfoldchanges", "pct_in"]] = top_genes_df1[["logfoldchanges", "pct_in"]].round(4).astype(str).astype(float)
+    
     for cluster, group_df in top_genes_df1.groupby('group', observed=True):
         cluster_dict = {}
         for record in group_df[cols_to_keep].to_dict(orient='records'):
@@ -93,6 +96,11 @@ def get_top_marker_genes(
     # Output 2 : based on pct_in - pct_out
     final_gene_dict2 = {}
     cols_to_keep = ['names', 'logfoldchanges', 'pvals_adj', 'pct_diff']
+
+    ## round float values for cleaner output
+    top_genes_df2[["logfoldchanges", "pct_diff"]] = top_genes_df2[["logfoldchanges", "pct_diff"]].round(4).astype(str).astype(float)
+    print(top_genes_df2[cols_to_keep].head())
+
     for cluster, group_df in top_genes_df2.groupby('group', observed=True):
         cluster_dict = {}
         for record in group_df[cols_to_keep].to_dict(orient='records'):

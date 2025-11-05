@@ -7,8 +7,9 @@ from google import genai
 from google.genai import types
 import json
 import re
-from typing import Dict, List, Union
-
+import os
+from typing import Dict, List, Optional, Union
+import pandas as pd
 from .logger import PipelineLogger
 
 logger = PipelineLogger.get_logger(__name__)
@@ -43,33 +44,33 @@ class CellTypeAnnotationClient:
     
     def __init__(
         self, 
-        model_name: str = "gemini-2.0-flash-exp",
-        temperature: float = 0.1,
-        max_retries: int = 3
+        model_name: str = "gemini-2.5-flash",
+        response_mime_type: str = "application/json",
+        max_retries: int = 3,
     ):
         """
         Initialize the Gemini API client.
         
         Args:
             model_name: Name of the LLM model to use
-            temperature: Temperature for response generation (0.0-1.0)
-            max_retries: Maximum number of retries for failed API calls
+            response_mime_type: Expected MIME type of the API response
+            max_retries: Number of retries for JSON parsing errors
         """
         self.client = genai.Client()
         self.model_name = model_name
-        self.temperature = temperature
+        self.response_mime_type = response_mime_type
         self.max_retries = max_retries
         logger.info(f"Initialized Gemini API client with model: {model_name}")
-        logger.info(f"Parameters: temperature={temperature}, max_retries={max_retries}")
+        logger.info(f"Parameters: max_retries={max_retries}, response_mime_type={response_mime_type}")
 
-    def select_cluster_resolution(self, prompt: str, image_data: str) -> Dict:
+    def select_cluster_resolution(self, prompt: str, custom_model: str = None) -> Dict:
         """
         Queries the Gemini model to determine the optimal clustering resolution 
         from a cluster tree image.
         
         Args:
             prompt: The formatted prompt for cluster resolution selection.
-            image_data: Base64-encoded PNG image of the cluster tree.
+            custom_model: Optional custom model name to override default.
         
         Returns:
             Dictionary containing the selected resolution and justification.
@@ -77,30 +78,29 @@ class CellTypeAnnotationClient:
             
         Raises:
             Exception: If all retry attempts fail
-        """
-        logger.info("Requesting cluster resolution selection from LLM")
-        
+        """     
+        model_to_use = custom_model if custom_model else self.model_name
+        logger.info(f"Requesting cluster resolution selection from LLM using {model_to_use}")
         for attempt in range(self.max_retries):
             try:
-                response = self.client.models.generate_content(
-                    model=self.model_name,
-                    contents=[
-                        {"text": prompt},
-                        {
-                            "inline_data": {
-                                "mime_type": "image/png",
-                                "data": image_data
-                            }
-                        }
-                    ],
-                    config=types.GenerateContentConfig(
-                        temperature=self.temperature,
-                    )
+                input_token = self.client.models.count_tokens(
+                    model=model_to_use,
+                    contents=prompt
                 )
-                
-                # Clean and parse JSON response
-                json_text = extract_json_from_response(response.text)
-                result = json.loads(json_text)
+                logger.info(f"[Cluster determination] Input prompt token count: {input_token.total_tokens}")
+                cls_res = self.client.models.generate_content(
+                    model=model_to_use,
+                    contents=prompt,
+                    config={
+                        "response_mime_type": self.response_mime_type
+                    }
+                )
+                logger.info(f"[Cluster determination] Thinking tokens used: {cls_res.usage_metadata.thoughts_token_count}")
+                logger.info(f"[Cluster determination] Output tokens used: {cls_res.usage_metadata.candidates_token_count}")
+                logger.info(f"[Cluster determination] Total tokens used: {cls_res.usage_metadata.total_token_count}")
+
+                # Parse JSON response
+                result = json.loads(cls_res.text)
                 
                 # Validate required fields
                 if 'resolution' not in result:
@@ -111,7 +111,7 @@ class CellTypeAnnotationClient:
                 
             except json.JSONDecodeError as e:
                 logger.warning(f"JSON parsing error (attempt {attempt + 1}/{self.max_retries}): {str(e)}")
-                logger.debug(f"Raw response: {response.text if 'response' in locals() else 'N/A'}")
+                logger.debug(f"Raw response: {cls_res.text if 'cls_res' in locals() else 'N/A'}")
                 if attempt == self.max_retries - 1:
                     logger.error(f"Failed to parse JSON after {self.max_retries} attempts")
                     raise
@@ -120,8 +120,8 @@ class CellTypeAnnotationClient:
                 if attempt == self.max_retries - 1:
                     logger.error(f"Failed after {self.max_retries} attempts")
                     raise
-    
-    def annotate_cell_types(self, prompt: str, image_data: str, candidate_cell_types: Dict = None) -> Union[List[Dict], Dict]:
+
+    def annotate_cell_types(self, prompt: str, nreplicate: int = 3, custom_model: str = None, custom_model_consolidation: Optional[str] = None) -> Dict:
         """
         Queries the Gemini model to perform cell type annotation based on marker genes 
         and UMAP visualization.
@@ -129,10 +129,10 @@ class CellTypeAnnotationClient:
         Args:
             prompt: The formatted prompt containing marker genes, pathways, 
                    and candidate cell types.
-            image_data: Base64-encoded PNG image of the UMAP plot.
-            candidate_cell_types: Optional dictionary of candidate cell types to validate against.
-                                If provided, will check that returned cell types match candidates.
-        
+            nreplicate: Number of replicate annotations to request for robustness.
+            custom_model: Optional custom model name to override default.
+            custom_model_consolidation: Optional custom model name for consolidation step, only effective if nreplicate>1.
+
         Returns:
             List of dictionaries containing cell type annotations for each cluster.
             Each dict has: {'cluster_id': str, 'cell_type_hypotheses': str, 
@@ -142,77 +142,81 @@ class CellTypeAnnotationClient:
         Raises:
             Exception: If all retry attempts fail
         """
-        logger.info("Requesting cell type annotation from LLM")
-        
-        # Extract valid cell type names from candidates for validation
-        valid_cell_types = set()
-        if candidate_cell_types:
-            valid_cell_types = set(candidate_cell_types.keys())
-            valid_cell_types.add("Unknown")  # "Unknown" is always valid
-            logger.debug(f"Valid candidate cell types: {valid_cell_types}")
+        model_to_use = custom_model if custom_model else self.model_name
+        logger.info(f"Requesting cell type annotation from LLM using {model_to_use}")
         
         for attempt in range(self.max_retries):
             try:
-                response = self.client.models.generate_content(
-                    model=self.model_name,
-                    contents=[
-                        {"text": prompt},
-                        {
-                            "inline_data": {
-                                "mime_type": "image/png",
-                                "data": image_data
-                            }
-                        }
-                    ],
-                    config=types.GenerateContentConfig(
-                        temperature=self.temperature,
-                    )
+                input_token = self.client.models.count_tokens(
+                    model=model_to_use,
+                    contents=prompt
                 )
-                
-                # Clean and parse JSON response
-                json_text = extract_json_from_response(response.text)
-                result = json.loads(json_text)
-                
-                # Validate response format
-                if isinstance(result, list):
-                    # Validate each annotation has required fields
-                    for ann in result:
-                        if 'cluster_id' not in ann or 'cell_type_hypotheses' not in ann:
-                            raise ValueError(f"Annotation missing required fields: {ann}")
-                elif isinstance(result, dict):
-                    # Single annotation, convert to list
-                    if 'cluster_id' not in result or 'cell_type_hypotheses' not in result:
-                        raise ValueError(f"Annotation missing required fields: {result}")
-                else:
-                    raise ValueError(f"Unexpected response type: {type(result)}")
-                
-                # Validate cell types against candidates if provided
-                if candidate_cell_types and valid_cell_types:
-                    annotations_to_check = result if isinstance(result, list) else [result]
+                logger.info(f"[Cell annotation] Input prompt token count: {input_token.total_tokens}")
+                res = []
+                total_tokens = 0
+                for i in range(nreplicate):
+                    if nreplicate>1: logger.info(f"Generating annotation replicate {i + 1}/{nreplicate}")
+                    ann_res = self.client.models.generate_content(
+                        model=model_to_use,
+                        contents=prompt,
+                        config={
+                            "response_mime_type": self.response_mime_type
+                        }
+                    )
+                    res.append(ann_res)
+                    total_tokens += ann_res.usage_metadata.total_token_count
+                    if nreplicate>1: logger.info(f"[Cell annotation] {total_tokens} total tokens used until now.")
+                logger.info(f"[Cell annotation] Annotation done. Total tokens used for annotation process: {total_tokens}")
+
+                ## run consolidation if multiple replicates
+                if nreplicate>1:
+                    custom_model_consolidation = custom_model_consolidation if custom_model_consolidation else self.model_name
+                    logger.info(f"[Cell annotation - Consolidation] Consolidating {nreplicate} annotation replicates with model {custom_model_consolidation}")
+                    from .prompts import CONSENSUS_INSTRUCTION
+
+                    ## combine all annotations into pandas DataFrame
+                    res_df = []
+                    for i in range(len(res)):
+                        r = res[i]
+                        res_df.append(pd.DataFrame(json.loads(r.text)).assign(rep = i))
+                    res_df = pd.concat(res_df).sort_values("cluster_id")
+                    ## convert it to dict 
+                    res_df_dict = {}
+                    for cluster, group_df in res_df.groupby("cluster_id", observed=True):
+                        res_df_dict[str(cluster)] = group_df.drop(columns="cluster_id").to_dict(orient='records')
+
+                    ## build prompt for consolidation
+                    ann_consensus_contents = [
+                        CONSENSUS_INSTRUCTION,
+                        json.dumps(res_df_dict)
+                    ]
+                    input_token = self.client.models.count_tokens(
+                        model=custom_model_consolidation,
+                        contents=ann_consensus_contents
+                    )
+                    logger.info(f"[Cell annotation - Consolidation] Input prompt token count: {input_token.total_tokens}")
+                    ann_consensus_res = self.client.models.generate_content(
+                        model=custom_model_consolidation,
+                        contents=ann_consensus_contents,
+                        config={
+                            "response_mime_type": self.response_mime_type
+                        }
+                    )
+                    logger.info(f"[Cell annotation - Consolidation] Done. Tokens used: {ann_consensus_res.usage_metadata.total_token_count}")
                     
-                    for ann in annotations_to_check:
-                        cell_type = ann.get('cell_type_hypotheses', '')
-                        
-                        # Check if the cell type is in valid candidates or "Unknown"
-                        is_valid = False
-                        
-                        if cell_type in valid_cell_types:
-                            # Direct match
-                            is_valid = True
-                        
-                        if not is_valid:
-                            raise ValueError(
-                                f"LLM returned invalid annotation with cell types, for example {cell_type} is not one of given candidate cell types: {valid_cell_types}"
-                            )
-                        
-                
-                num_annotations = len(result) if isinstance(result, list) else 1
-                logger.info(f"Successfully received valid annotations for {num_annotations} clusters")
-                return result
+                    # Parse JSON response
+                    result = json.loads(ann_consensus_res.text)
+                else:
+                    # Parse JSON response
+                    result = json.loads(res[0].text)
+                    res_df_dict = None
+                logger.info(f"Annotation cell types for {len(result)} clusters done.")
+                return result, res_df_dict
                 
             except json.JSONDecodeError as e:
                 logger.warning(f"JSON parsing error (attempt {attempt + 1}/{self.max_retries}): {str(e)}")
-                logger.debug(f"Raw response: {response.text if 'response' in locals() else 'N/A'}")
+                logger.debug(f"Raw response: {res[0].text if 'res' in locals() and res[0] else 'N/A'}")
+                logger.debug(f"Consolidation response: {ann_consensus_res.text if 'ann_consensus_res' in locals() else 'N/A'}")
                 if attempt == self.max_retries - 1:
                     logger.error(f"Failed to parse JSON after {self.max_retries} attempts")
                     raise

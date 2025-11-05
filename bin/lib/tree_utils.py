@@ -54,13 +54,15 @@ def find_node_data(tree_dict: Dict, cell_name: str, raise_on_missing: bool = Fal
     return None
 
 
-def get_immediate_children(node_data: Optional[Dict]) -> Dict[str, Dict[str, Union[str, bool]]]:
+def get_immediate_children(node_data: Optional[Dict], include_parent: bool = False, parent_name: str = "") -> Dict[str, Dict[str, Union[str, bool]]]:
     """
     Extracts only the direct children of a node from the cell type hierarchy tree.
     
     Args:
         node_data (Optional[Dict]): The data dictionary for a single cell type node.
                                    Expected to contain a 'children' key with nested cell type data.
+        include_parent (bool): If True, include the parent node in the output (default: False).
+        parent_name (str): The name of the parent node (used if include_parent is True).
     
     Returns:
         Dict[str, Dict[str, Union[str, bool]]]: A dictionary mapping child cell type names to their metadata.
@@ -86,6 +88,11 @@ def get_immediate_children(node_data: Optional[Dict]) -> Dict[str, Dict[str, Uni
         res_data[key] = {
             "definition": values["definition"],
             "has_children": bool(values.get("children", {})),
+        }
+    if include_parent:
+        res_data[parent_name] = {
+            "definition": node_data["definition"],
+            "has_children": True,
         }
     return res_data
 

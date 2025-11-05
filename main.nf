@@ -48,9 +48,10 @@ def helpMessage() {
       --condition_num INT     Number of expected condition-driven groups or artifacts (default: 1)
       
       LLM Configuration:
-      --llm_model STRING      LLM model name (default: gemini-2.0-flash-exp)
-      --llm_temperature FLOAT Temperature for LLM (default: 0.1)
-      --llm_max_retries INT   Max retries for LLM calls (default: 3)
+      --llm_model_general STRING      LLM model for general purpose (default: gemini-2.5-flash)
+      --llm_model_complicated STRING  LLM model for complicated tasks (default: gemini-2.5.pro)
+      --llm_nreplies INT              Number of replies to request from LLM (default: 1)
+      --llm_max_retries INT    Maximum retries for LLM API calls (default: 3)
       
       Feature Extraction:
       --top_genes INT         Number of top marker genes per cluster (default: 20)
@@ -112,30 +113,31 @@ log.info """
 ============================================================================
 Cell Type Annotation Pipeline
 ============================================================================
-Input h5ad    : ${params.input_h5ad}
-Tree JSON     : ${params.tree_json}
-Context       : ${params.context}
-Batch key     : ${params.batch_key ?: 'none'}
-Integration   : ${params.integration}
-CPUs per task : ${params.cpus}
-Output dir    : ${params.outdir}
-Min cells     : ${params.min_cells}
-Condition num : ${params.condition_num}
+Input h5ad           : ${params.input_h5ad}
+Tree JSON            : ${params.tree_json}
+Context              : ${params.context}
+Batch key            : ${params.batch_key ?: 'none'}
+Integration          : ${params.integration}
+CPUs per task        : ${params.cpus}
+Output dir           : ${params.outdir}
+Min cells            : ${params.min_cells}
+Condition num        : ${params.condition_num}
 
 LLM Configuration:
-  Model       : ${params.llm_model}
-  Temperature : ${params.llm_temperature}
-  Max retries : ${params.llm_max_retries}
+  Model (general).   : ${params.llm_model_general}
+  Model (complicated): ${params.llm_model_complicated}
+  Max retries        : ${params.llm_max_retries}
+  Number of replies  : ${params.llm_nreplies}
 
 Feature Extraction:
-  Top genes   : ${params.top_genes}
-  Top pathways: ${params.top_pathways}
+  Top genes          : ${params.top_genes}
+  Top pathways       : ${params.top_pathways}
 
 GSEA Configuration:
-  Databases   : ${params.gsea_databases}
+  Databases          : ${params.gsea_databases}
 
 Logging Configuration:
-  Log level   : ${params.log_level}
+  Log level          : ${params.log_level}
 ============================================================================
 """
 
@@ -182,9 +184,9 @@ process SPLIT_DATASET {
         --output-dir . \\
         --min-cells ${params.min_cells} \\
         --condition-num ${params.condition_num} \\
-        --llm-model "${params.llm_model}" \\
-        --llm-temperature ${params.llm_temperature} \\
-        --llm-max-retries ${params.llm_max_retries} \\
+        --llm-model-general "${params.llm_model_general}" \\
+        --llm-model-complicated "${params.llm_model_complicated}" \\
+        --llm-nreplies ${params.llm_nreplies} \\
         --gsea-databases "${params.gsea_databases}" \\
         --top-genes ${params.top_genes} \\
         --top-pathways ${params.top_pathways} \\
@@ -203,7 +205,8 @@ process RUN_NESTED_ANNOTATION {
     tag "${split_file.baseName}"
     publishDir "${params.outdir}/annotation/", mode: 'copy', pattern: "responses/*.json"
     publishDir "${params.outdir}/annotation/", mode: 'copy', pattern: "figures/*.png"
-    publishDir "${params.outdir}/annotation/", mode: 'copy', pattern: "data/*.tsv"  // Only export TSV, not h5ad
+    publishDir "${params.outdir}/annotation/", mode: 'copy', pattern: "data/*.tsv" 
+    publishDir "${params.outdir}/annotation/", mode: 'copy', pattern: "data/*.h5ad"
     publishDir "${params.outdir}/logs/", mode: 'copy', pattern: "logs/*.log", saveAs: { filename -> 
         def celltype = split_file.baseName
         def logname = filename.split('/')[-1]
@@ -248,9 +251,9 @@ process RUN_NESTED_ANNOTATION {
         --output-dir . \\
         --min-cells ${params.min_cells} \\
         --condition-num ${params.condition_num} \\
-        --llm-model "${params.llm_model}" \\
-        --llm-temperature ${params.llm_temperature} \\
-        --llm-max-retries ${params.llm_max_retries} \\
+        --llm-model-general "${params.llm_model_general}" \\
+        --llm-model-complicated "${params.llm_model_complicated}" \\
+        --llm-nreplies ${params.llm_nreplies} \\
         --gsea-databases "${params.gsea_databases}" \\
         --top-genes ${params.top_genes} \\
         --top-pathways ${params.top_pathways} \\
@@ -272,7 +275,6 @@ process RUN_NESTED_ANNOTATION {
 * Process 3: Aggregate responses and annotations
 */
 process AGGREGATION {
-    cache false
     tag "Aggregate annotations"
     publishDir "${params.outdir}/annotation/", mode: 'copy', pattern: "consolidated_*.{json,tsv}"
     
@@ -345,7 +347,7 @@ if log_files:
         "--log-files", log_files,
         "--output", "log_analysis.json",
         "--log-level", "${params.log_level}",
-        "--llm-model", "${params.llm_model}"
+        "--llm-model", "${params.llm_model_general}"
     ])
 else:
     print("No log files found, skipping log analysis!")

@@ -1057,7 +1057,7 @@ def generate_html_summary(
                 
                 html_content += f"""                            <tr>
                                 <td><strong>{ann.get('cluster_id', 'N/A')}</strong></td>
-                                <td>{ann.get('cell_type_hypotheses', 'N/A')}</td>
+                                <td>{ann.get('cell_type', 'N/A')}</td>
                                 <td><span class="confidence-badge {confidence_class}">{confidence}</span></td>
                                 <td><div class="marker-list">{markers_html}</div></td>
                                 <td>{ann.get('justification', 'N/A')}</td>

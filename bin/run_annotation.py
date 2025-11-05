@@ -102,9 +102,10 @@ def run_annotation(
     output_dir: str = ".",
     min_cells_for_subtype: int = 1000,
     condition_num: int = 1,
-    llm_model: str = "gemini-2.0-flash-exp",
-    llm_temperature: float = 0.1,
+    llm_model_general: str = "gemini-2.5-flash",
+    llm_model_complicated: str = "gemini-2.5.pro",
     llm_max_retries: int = 3,
+    llm_nreplies: int = 1,
     gsea_databases: str = "MSigDB_Hallmark_2020,KEGG_2021_Human",
     top_genes: int = 20,
     top_pathways: int = 20,
@@ -126,9 +127,10 @@ def run_annotation(
         output_dir: Output directory for results.
         min_cells_for_subtype: Minimum cells required for subtype annotation.
         condition_num: Number of expected condition-driven groups or artifacts.
-        llm_model: Name of the LLM model to use.
-        llm_temperature: Temperature for LLM generation.
-        llm_max_retries: Maximum retries for LLM API calls.
+        llm_model_general: Name of the LLM model for general purpose (default: "gemini-2.5-flash").
+        llm_model_complicated: Name of the LLM model for complicated tasks (default: "gemini-2.5.pro").
+        llm_nreplies: Number of replies to request from LLM (default: 1, used for cell type annotation).
+        llm_max_retries: Maximum retries for LLM API calls (default: 3).
         gsea_databases: Comma-separated list of gene set databases.
         top_genes: Number of top marker genes per cluster.
         top_pathways: Number of top pathways per cluster.
@@ -181,9 +183,10 @@ def run_annotation(
     logger.info(f"  Output dir: {output_dir}")
     logger.info(f"  Min cells for subtype: {min_cells_for_subtype}")
     logger.info(f"  Condition num: {condition_num}")
-    logger.info(f"  LLM model: {llm_model}")
-    logger.info(f"  LLM temperature: {llm_temperature}")
+    logger.info(f"  LLM model (general): {llm_model_general}")
+    logger.info(f"  LLM model (complicated): {llm_model_complicated}")
     logger.info(f"  LLM max retries: {llm_max_retries}")
+    logger.info(f"  LLM nreplies: {llm_nreplies}")
     logger.info(f"  GSEA databases: {gsea_databases}")
     logger.info(f"  Top genes: {top_genes}")
     logger.info(f"  Top pathways: {top_pathways}")
@@ -205,9 +208,10 @@ def run_annotation(
             hierarchical_collector=None,
             min_cells_for_subtype=min_cells_for_subtype,
             condition_num=condition_num,
-            llm_model=llm_model,
-            llm_temperature=llm_temperature,
+            llm_model_general=llm_model_general,
+            llm_model_complicated=llm_model_complicated,
             llm_max_retries=llm_max_retries,
+            llm_nreplies=llm_nreplies,
             gsea_databases=gsea_databases,
             top_genes=top_genes,
             top_pathways=top_pathways,
@@ -249,74 +253,39 @@ def main():
     list_parser.add_argument('--tree', required=True, help='Path to cell type hierarchy JSON file')
     list_parser.add_argument('--nextflow', action='store_true', help='Format output for Nextflow')
     
+    # Common arguments shared between split and annotate subcommands
+    common_args = [
+        ('--input', {'required': True, 'help': 'Path to QCed h5ad file'}),
+        ('--tree', {'required': True, 'help': 'Path to cell type hierarchy JSON file'}),
+        ('--context', {'required': True, 'help': 'Biological context description'}),
+        ('--batch-key', {'default': None, 'help': 'Batch key for integration'}),
+        ('--integration', {'action': 'store_true', 'help': 'Enable integration'}),
+        ('--cpus', {'type': int, 'default': 16, 'help': 'Number of CPUs (default: 16)'}),
+        ('--output-dir', {'default': 'work', 'help': 'Output directory (default: work)'}),
+        ('--min-cells', {'type': int, 'default': 1000, 'help': 'Minimum cells for subtype annotation (default: 1000)'}),
+        ('--condition-num', {'type': int, 'default': 1, 'help': 'Number of expected condition-driven groups or artifacts (default: 1)'}),
+        ('--llm-model-general', {'default': 'gemini-2.5-flash', 'help': 'LLM model name for general purpose (default: gemini-2.5-flash)'}),
+        ('--llm-model-complicated', {'default': 'gemini-2.5.pro', 'help': 'LLM model name for complicated tasks (default: gemini-2.5.pro)'}),
+        ('--llm-max-retries', {'type': int, 'default': 3, 'help': 'LLM max retries (default: 3)'}),
+        ('--llm-nreplies', {'type': int, 'default': 1, 'help': 'Number of replies to request from LLM (default: 1)'}),
+        ('--gsea-databases', {'default': 'MSigDB_Hallmark_2020,KEGG_2021_Human', 'help': 'Comma-separated list of gene set databases'}),
+        ('--top-genes', {'type': int, 'default': 20, 'help': 'Number of top marker genes per cluster (default: 20)'}),
+        ('--top-pathways', {'type': int, 'default': 20, 'help': 'Number of top pathways per cluster (default: 20)'}),
+        ('--log-level', {'default': 'INFO', 'choices': ['DEBUG', 'INFO', 'WARNING', 'ERROR'], 'help': 'Logging level (default: INFO)'}),
+    ]
+    
     # Subcommand to split dataset by all top-level cell types
     split_parser = subparsers.add_parser('split', help='Split dataset by all top-level cell types')
-    split_parser.add_argument('--input', required=True, help='Path to QCed h5ad file')
-    split_parser.add_argument('--tree', required=True, help='Path to cell type hierarchy JSON file')
-    split_parser.add_argument('--context', required=True, help='Biological context description')
-    split_parser.add_argument('--batch-key', default=None, help='Batch key for integration')
-    split_parser.add_argument('--integration', action='store_true', help='Enable integration')
-    split_parser.add_argument('--cpus', type=int, default=16, help='Number of CPUs (default: 16)')
-    split_parser.add_argument('--output-dir', default='work', help='Output directory (default: work)')
-    split_parser.add_argument('--min-cells', type=int, default=1000, 
-                             help='Minimum cells for subtype annotation (default: 1000)')
-    split_parser.add_argument('--condition-num', type=int, default=1,
-                             help='Number of expected condition-driven groups or artifacts (default: 1)')
-    
-    # LLM model configuration for split
-    split_parser.add_argument('--llm-model', default='gemini-2.0-flash-exp',
-                             help='LLM model name (default: gemini-2.0-flash-exp)')
-    split_parser.add_argument('--llm-temperature', type=float, default=0.1,
-                             help='LLM temperature (default: 0.1)')
-    split_parser.add_argument('--llm-max-retries', type=int, default=3,
-                             help='LLM max retries (default: 3)')
-    split_parser.add_argument('--gsea-databases', default='MSigDB_Hallmark_2020,KEGG_2021_Human',
-                             help='Comma-separated list of gene set databases')
-    split_parser.add_argument('--top-genes', type=int, default=20,
-                             help='Number of top marker genes per cluster (default: 20)')
-    split_parser.add_argument('--top-pathways', type=int, default=20,
-                             help='Number of top pathways per cluster (default: 20)')
-    split_parser.add_argument('--log-level', default='INFO',
-                             choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
-                             help='Logging level (default: INFO)')
+    for arg_name, arg_params in common_args:
+        split_parser.add_argument(arg_name, **arg_params)
     
     # Subcommand to run annotation
     annotate_parser = subparsers.add_parser('annotate', help='Run annotation for a cell type')
-    annotate_parser.add_argument('--input', required=True, help='Path to QCed h5ad file')
-    annotate_parser.add_argument('--tree', required=True, help='Path to cell type hierarchy JSON file')
     annotate_parser.add_argument('--celltype', required=True, help='Major cell type to annotate')
-    annotate_parser.add_argument('--context', required=True, help='Biological context description')
-    annotate_parser.add_argument('--batch-key', default=None, help='Batch key for integration')
-    annotate_parser.add_argument('--integration', action='store_true', help='Enable integration')
-    annotate_parser.add_argument('--cpus', type=int, default=16, help='Number of CPUs (default: 16)')
-    annotate_parser.add_argument('--output-dir', default='work', help='Output directory (default: work)')
-    annotate_parser.add_argument('--min-cells', type=int, default=1000, 
-                                 help='Minimum cells for subtype annotation (default: 1000)')
-    annotate_parser.add_argument('--condition-num', type=int, default=1,
-                                 help='Number of expected condition-driven groups or artifacts (default: 1)')
-    
-    # LLM model configuration
-    annotate_parser.add_argument('--llm-model', default='gemini-2.0-flash-exp',
-                                 help='LLM model name (default: gemini-2.0-flash-exp)')
-    annotate_parser.add_argument('--llm-temperature', type=float, default=0.1,
-                                 help='LLM temperature (default: 0.1)')
-    annotate_parser.add_argument('--llm-max-retries', type=int, default=3,
-                                 help='LLM max retries (default: 3)')
-    
-    # GSEA configuration
-    annotate_parser.add_argument('--gsea-databases', default='MSigDB_Hallmark_2020,KEGG_2021_Human',
-                                 help='Comma-separated list of gene set databases (default: MSigDB_Hallmark_2020,KEGG_2021_Human)')
-    annotate_parser.add_argument('--top-genes', type=int, default=20,
-                                 help='Number of top marker genes per cluster (default: 20)')
-    annotate_parser.add_argument('--top-pathways', type=int, default=20,
-                                 help='Number of top pathways per cluster (default: 20)')
-    
-    # Annotation control
+    for arg_name, arg_params in common_args:
+        annotate_parser.add_argument(arg_name, **arg_params)
     annotate_parser.add_argument('--no-nest', action='store_false', dest='nested',
                                  help='Disable nested/recursive annotation of subtypes (only annotate top-level)')
-    annotate_parser.add_argument('--log-level', default='INFO',
-                                 choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
-                                 help='Logging level (default: INFO)')
     
     args = parser.parse_args()
     
@@ -346,9 +315,10 @@ def main():
             output_dir=args.output_dir,
             min_cells_for_subtype=args.min_cells,
             condition_num=args.condition_num,
-            llm_model=args.llm_model,
-            llm_temperature=args.llm_temperature,
+            llm_model_general=args.llm_model_general,
+            llm_model_complicated=args.llm_model_complicated,
             llm_max_retries=args.llm_max_retries,
+            llm_nreplies=args.llm_nreplies,
             gsea_databases=args.gsea_databases,
             top_genes=args.top_genes,
             top_pathways=args.top_pathways,
@@ -369,9 +339,10 @@ def main():
             output_dir=args.output_dir,
             min_cells_for_subtype=args.min_cells,
             condition_num=args.condition_num,
-            llm_model=args.llm_model,
-            llm_temperature=args.llm_temperature,
+            llm_model_general=args.llm_model_general,
+            llm_model_complicated=args.llm_model_complicated,
             llm_max_retries=args.llm_max_retries,
+            llm_nreplies=args.llm_nreplies,
             gsea_databases=args.gsea_databases,
             top_genes=args.top_genes,
             top_pathways=args.top_pathways,

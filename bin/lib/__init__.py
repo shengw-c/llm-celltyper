@@ -11,7 +11,7 @@ from .pathway_enrichment import get_top_enriched_pathways
 from .cluster_analysis import get_cluster_adjacency
 from .llm_client import CellTypeAnnotationClient
 from .annotator import annotate_cell_types, HierarchicalAnnotation
-from .prompts import cluster_PROMPT, Celltyper_Instruction
+from .prompts import cluster_PROMPT, Celltyper_Instruction, Consolidator_Instruction
 
 __all__ = [
     'PipelineLogger',
@@ -30,4 +30,5 @@ __all__ = [
     'HierarchicalAnnotation',
     'cluster_PROMPT',
     'Celltyper_Instruction',
+    'Consolidator_Instruction',
 ]

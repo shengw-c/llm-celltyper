@@ -4,6 +4,7 @@ Data processing utilities for single-cell RNA-seq analysis.
 Includes functions for normalization, dimensionality reduction, and clustering.
 """
 
+import json
 from typing import Dict, List, Optional, Tuple
 import scanpy as sc
 import numpy as np
@@ -165,12 +166,15 @@ def prepare_subset_dataset(
             key_added=f"leiden_{str(resolution).replace('.', '_')}",
         )
 
+    ## prepare the cluster labels
+    labels = [f"leiden_{str(resolution).replace('.', '_')}" for resolution in resolutions]
+    
     # Save cluster trees
     logger.info("Generating cluster tree visualization")
     cluster_tree_file = os.path.join(fig_folder, f"cluster_trees.{nametag}.png")
     fig = clustree(
         adata,
-        [f"leiden_{str(resolution).replace('.', '_')}" for resolution in resolutions],
+        labels,
         edge_weight_threshold=0.1,
     )
     fig.set_size_inches(10, 13)
@@ -178,19 +182,37 @@ def prepare_subset_dataset(
     fig.savefig(cluster_tree_file, bbox_inches='tight')
     logger.info(f"Cluster tree saved: {cluster_tree_file}")
 
+    ## build adjacency matrices for LLM to pick up a good resolution
+    # Dictionary to store all the flow matrices
+    flow_matrices = {}
+    df = adata.obs
+    # Loop through adjacent pairs of columns
+    for i in range(len(labels) - 1):
+        col_low = labels[i]      # e.g., 'leiden_0_55'
+        col_high = labels[i+1]   # e.g., 'leiden_0_6'
+        
+        # Create the contingency table
+        adj_matrix = pd.crosstab(df[col_low], df[col_high], normalize="index").round(2)
+
+        # Store it in the dictionary
+        matrix_name = f"{col_low}_to_{col_high}"
+        flow_matrices[matrix_name] = adj_matrix
+    flow_matrices_json_ready = {}
+    for matrix_name, matrix_df in flow_matrices.items():
+        # "split" orientation is great because it's easy to reconstruct
+        flow_matrices_json_ready[matrix_name] = matrix_df.to_dict(orient="split")
+    
+    flow_matrices_json_ready = json.dumps(flow_matrices_json_ready, indent=2)
+    logger.debug(f"Flow matrices JSON ready (length: {len(flow_matrices_json_ready)} characters)")
+
     # Save adata
     subset_adata_file = os.path.join(data_folder, f"{nametag}_subset.h5ad")
     adata.write_h5ad(subset_adata_file, compression='gzip')
     logger.info(f"Subset AnnData saved: {subset_adata_file}")
 
-    # Encode image to base64
-    with open(cluster_tree_file, "rb") as image_file:
-        encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
-    logger.debug(f"Cluster tree encoded to base64 (length: {len(encoded_image)} characters)")
-
     return {
-        "encoded_cluster_tree": encoded_image,
         "subset_adata": subset_adata_file,
+        "cluster_adjacency_matrix": flow_matrices_json_ready,
         "cluster_tree_file": cluster_tree_file
     }
 
@@ -222,12 +244,6 @@ def generate_umap_visualization(
     umap.set_dpi(100)
     umap.savefig(output_file)
     logger.info(f"UMAP saved: {output_file}")
-    
-    # Encode to base64
-    with open(output_file, "rb") as image_file:
-        encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
-    
-    return encoded_image
 
 
 def prepare_celltype_inputs(
@@ -302,7 +318,7 @@ def prepare_celltype_inputs(
     
     # Generate UMAP plot
     umap_file = f"{fig_folder}/umap.{nametag}.png"
-    encoded_umap = generate_umap_visualization(adata, sel_cls, umap_file)
+    generate_umap_visualization(adata, sel_cls, umap_file)
 
     # Rank genes
     logger.info(f"Ranking genes for clusters using method=wilcoxon")
@@ -312,7 +328,7 @@ def prepare_celltype_inputs(
     from .marker_genes import get_top_marker_genes
     logger.info(f"Extracting top {top_genes} marker genes per cluster")
     top_genes_by_score, top_genes_by_specificity = get_top_marker_genes(adata, sel_cls, n_genes=top_genes)
-    logger.info(f"Extracted marker genes for {len(top_genes_by_score)} clusters")
+    logger.info(f"Extracted marker genes...")
 
     # Get enriched pathways
     from .pathway_enrichment import get_top_enriched_pathways
@@ -321,20 +337,19 @@ def prepare_celltype_inputs(
         gene_sets = [db.strip() for db in gsea_databases.split(',')]
     logger.info(f"Running pathway enrichment (GSEA), extracting top {top_pathways} pathways per cluster")
     pathways = get_top_enriched_pathways(adata, sel_cls, gene_sets, n_pathways=top_pathways, cpus=cpus)
-    logger.info(f"Extracted pathways for {len(pathways)} clusters")
+    logger.info(f"Extracted pathways...")
 
     # Get cluster adjacency
     from .cluster_analysis import get_cluster_adjacency
     logger.info("Computing cluster adjacency (PAGA)")
-    adjacency = get_cluster_adjacency(adata, sel_cls)
-    logger.info(f"Computed adjacency for {len(adjacency)} clusters")
+    adjacency_dict = get_cluster_adjacency(adata, sel_cls)
+    logger.info(f"Computed adjacency...")
 
     logger.info("All inputs prepared successfully")
     return {
         "top_genes_by_score": top_genes_by_score,
         "top_genes_by_specificity": top_genes_by_specificity,
         "top_pathways": pathways,
-        "consolidator_neighbors": adjacency,
-        "encoded_umap": encoded_umap,
+        "adjacency": adjacency_dict,
         "umap_file": umap_file
     }
