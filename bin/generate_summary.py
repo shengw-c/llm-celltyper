@@ -951,7 +951,7 @@ def generate_html_summary(
         annotation_data = data.get("annotation", {})
         
         cluster_response = cluster_data.get("cluster_selection_response", {})
-        annotations = annotation_data.get("annotation_response", [])
+        annotations = annotation_data.get("final_annotations", [])
         level = data.get("level", 0)
         
         html_content += f"""            <div id="{nametag}" class="tab-content {active_class}">

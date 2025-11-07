@@ -13,7 +13,6 @@ from .logger import PipelineLogger
 from .llm_client import CellTypeAnnotationClient
 from .data_processing import prepare_subset_dataset, prepare_celltype_inputs
 from .tree_utils import find_node_data, get_immediate_children, TreeValidationError
-from .prompts import cluster_PROMPT, Celltyper_Instruction
 
 logger = PipelineLogger.get_logger(__name__)
 
@@ -165,6 +164,7 @@ def annotate_cell_types(
     general_context: str, 
     nametag: str, 
     input_file: str, 
+    parent_cell_type: Optional[str] = None,
     batch_key: Optional[List[str]] = None,
     integration: bool = False, 
     subset_cell_id_file: Optional[str] = None,
@@ -177,6 +177,7 @@ def annotate_cell_types(
     llm_model_complicated: str = "gemini-2.5.pro",
     llm_max_retries: int = 3,
     llm_nreplies: int = 1,
+    llm_adaptive: bool = True,
     gsea_databases: str = "MSigDB_Hallmark_2020,KEGG_2021_Human",
     top_genes: int = 20,
     top_pathways: int = 20,
@@ -190,6 +191,7 @@ def annotate_cell_types(
     then recursively annotates subtypes for any cell types that have children in the tree.
     
     Args:
+        parent_cell_type: Name of the parent cell type (None if at root level).
         expected_cells: Dictionary of expected cell types at this level.
                        Format: {cell_name: {'has_children': bool, 'definition': str}}
         tree_file: Path to JSON file containing the complete cell type hierarchy tree.
@@ -208,6 +210,7 @@ def annotate_cell_types(
         llm_model_complicated: Name of the LLM model for complicated tasks (default: "gemini-2.5.pro").
         llm_nreplies: Number of replies to request from LLM (default: 1, used for cell type annotation).
         llm_max_retries: Maximum retries for LLM API calls (default: 3).
+        llm_adaptive: If True, only replicate annotations for Low/Medium confidence clusters (default: True).
         gsea_databases: Comma-separated list of gene set databases (default: "MSigDB_Hallmark_2020,KEGG_2021_Human").
         top_genes: Number of top marker genes per cluster (default: 20).
         top_pathways: Number of top pathways per cluster (default: 20).
@@ -253,16 +256,13 @@ def annotate_cell_types(
     
     ## Determine the good resolution
     logger.info("Selecting optimal clustering resolution")
-    cls_contents = [
-        cluster_PROMPT.format(
-            cell_type_num=len(expected_cells),
-            condition_num=condition_num,
-            transition_cutoff=0.1
-        ),
-        dataset["cluster_adjacency_matrix"]
-    ]
-
-    cls_response = client.select_cluster_resolution(cls_contents)
+    cls_response = client.select_cluster_resolution(
+        except_cell_types=expected_cells,
+        conditions=condition_num,
+        cluster_adjacency_matrix_dict=dataset["cluster_adjacency_matrix"],
+        transition_cutoff=0.1,
+        custom_model=llm_model_general
+    )
 
     # Save cluster selection response
     cluster_response_file = os.path.join(responses_dir, f"{nametag}_cluster_selection.json")
@@ -297,30 +297,20 @@ def annotate_cell_types(
     
     ## Run annotation
     logger.info("Running LLM-based cell type annotation")
-    # Use the new simplified dictionary keys
-    formated_prompt = Celltyper_Instruction.format(
-        expr_context=general_context,
-        candidate_cell_types=json.dumps(expected_cells),
-        marker_genes_json=json.dumps(ann_input["top_genes_by_specificity"]),
-        pathway_json=json.dumps(ann_input["top_pathways"]),
-        cluster_adjacency_json=json.dumps(ann_input["adjacency"])
-    )
-
-    logger.debug(f"Annotation prompt: {formated_prompt}")
-    ann_dict, res_df_dict = client.annotate_cell_types(
-        formated_prompt, 
+    allres, ann_dict = client.annotate_cell_types(
+        context=general_context,
+        parent_cell_type=parent_cell_type,
+        candidate_cell_types=expected_cells,
+        marker_genes=ann_input["top_genes_by_specificity"],
+        pathways=ann_input["top_pathways"],
+        cluster_adjacency=ann_input["adjacency"],
         nreplicate=llm_nreplies,
         custom_model=llm_model_complicated,
-        custom_model_consolidation=llm_model_general
+        custom_model_consolidation=llm_model_complicated,
+        adaptive=llm_adaptive
     )
 
     # Save cell type annotation response
-    if not res_df_dict is None:
-        # Save replicate responses if available
-        replicate_annotation_response_file = os.path.join(responses_dir, f"{nametag}_cell_annotation_by_replicate.json")
-        with open(replicate_annotation_response_file, 'w') as f:
-            json.dump(res_df_dict, f, indent=2)
-
     annotation_response_file = os.path.join(responses_dir, f"{nametag}_cell_annotation.json")
     with open(annotation_response_file, 'w') as f:
         json.dump({
@@ -332,7 +322,8 @@ def annotate_cell_types(
             "marker_genes_used": ann_input["top_genes_by_specificity"],
             "pathways_used":  ann_input["top_pathways"],
             "resolution": cls_response["resolution"],
-            "annotation_response": ann_dict,
+            "llm_responses": json.dumps(allres, indent=2),
+            "final_annotations": ann_dict,
             "umap_file": ann_input.get("umap_file", ""),
         }, f, indent=2)
     logger.info(f"Saved annotation response: {annotation_response_file}")
@@ -341,16 +332,12 @@ def annotate_cell_types(
     logger.info("Processing annotation results")
     # Use the previously loaded AnnData object to avoid redundant I/O
     cluster_col = f'leiden_{str(cls_response["resolution"]).replace(".", "_")}'
-    df = adata.obs[[cluster_col]].copy()
+    df = adata.obs[[cluster_col]].rename(columns={cluster_col: "cluster_id"}).copy()
 
     # Convert ann_dict to DataFrame
     ann_df = pd.DataFrame(ann_dict)
-    try:
-        ann_dict = ann_df.set_index("cluster_id")["cell_type"].to_dict()
-    except KeyError as e:
-        logger.info("No consensus 'cell_type' found in annotation, falling back to 'cell_type_hypotheses'")
-        ann_dict = ann_df.set_index("cluster_id")["cell_type_hypotheses"].to_dict()
-    df["ann"] = adata.obs[cluster_col].map(ann_dict)
+    ann_dict = ann_df.set_index("cluster_id")["cell_type"].to_dict()
+    df["ann"] = df["cluster_id"].map(ann_dict)
     
     # Add to hierarchical collector
     hierarchical_collector.add_annotation(nametag, df, current_level)
@@ -447,6 +434,7 @@ def annotate_cell_types(
             # Recursive call for subtype annotation
             logger.info(f"Recursively annotating subtypes of '{key}'")
             annotate_cell_types(
+                parent_cell_type=key,
                 expected_cells=sub_expected_cells,
                 tree_file=tree_file,
                 general_context=sub_general_context,
@@ -464,6 +452,7 @@ def annotate_cell_types(
                 llm_model_complicated=llm_model_complicated,
                 llm_max_retries=llm_max_retries,
                 llm_nreplies=llm_nreplies,
+                llm_adaptive=llm_adaptive,
                 gsea_databases=gsea_databases,
                 top_genes=top_genes,
                 top_pathways=top_pathways,

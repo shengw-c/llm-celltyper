@@ -99,7 +99,6 @@ def get_top_marker_genes(
 
     ## round float values for cleaner output
     top_genes_df2[["logfoldchanges", "pct_diff"]] = top_genes_df2[["logfoldchanges", "pct_diff"]].round(4).astype(str).astype(float)
-    print(top_genes_df2[cols_to_keep].head())
 
     for cluster, group_df in top_genes_df2.groupby('group', observed=True):
         cluster_dict = {}

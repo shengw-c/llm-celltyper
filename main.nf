@@ -359,6 +359,7 @@ EOF
  * Process 4: Generate HTML summary report
  */
 process GENERATE_SUMMARY {
+    cache false
     tag "Generate summary"
     publishDir "${params.outdir}", mode: 'copy'
     

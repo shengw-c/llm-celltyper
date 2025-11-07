@@ -36,7 +36,7 @@ class AnnotationNode:
         result = dict(self.data)
         
         # Add unique IDs and process children recursively
-        if 'annotation_response' in result:
+        if 'final_annotations' in result:
             self._add_unique_ids_and_children(result, self.nametag, self.children)
         
         return result
@@ -52,7 +52,7 @@ class AnnotationNode:
         
         # First, add unique IDs using the tree structure
         temp_result = dict(self.data)
-        if 'annotation_response' in temp_result:
+        if 'final_annotations' in temp_result:
             self._add_unique_ids_and_children(temp_result, self.nametag, self.children)
         
         # Now flatten the tree structure
@@ -74,8 +74,8 @@ class AnnotationNode:
                         current_cell_type = annot.get('cell_type', 'Unknown')
                         flatten_annotations(annot['children'], current_cell_type)
         
-        if 'annotation_response' in temp_result:
-            flatten_annotations(temp_result['annotation_response'], "Root")
+        if 'final_annotations' in temp_result:
+            flatten_annotations(temp_result['final_annotations'], "Root")
         
         return flat_dict
     
@@ -85,16 +85,16 @@ class AnnotationNode:
         Recursively add unique IDs and nest children in the annotation response.
         
         Args:
-            result: The dictionary containing annotation_response to process
+            result: The dictionary containing final_annotations to process
             current_nametag: The nametag of the current level
             child_nodes: List of child AnnotationNode objects
             parent_unique_id: The unique_id prefix from parent (e.g., "0" or "0.1")
         """
-        if 'annotation_response' not in result:
+        if 'final_annotations' not in result:
             return
         
         # Add unique IDs to annotations at this level
-        for annotation in result['annotation_response']:
+        for annotation in result['final_annotations']:
             cluster_id = annotation['cluster_id']
             
             # Create unique hierarchical ID
@@ -112,13 +112,13 @@ class AnnotationNode:
             child_cell_type = self._extract_cell_type_from_nametag(child_node.nametag, current_nametag)
             
             # Find parent annotation(s) that match this cell type
-            for annotation in result['annotation_response']:
+            for annotation in result['final_annotations']:
                 if annotation['cell_type'] == child_cell_type:
                     # This annotation should contain the child's annotations
                     parent_unique_id_for_children = annotation['unique_id']
                     
                     # Get child data and process it recursively
-                    child_result = {'annotation_response': list(child_node.data.get('annotation_response', []))}
+                    child_result = {'final_annotations': list(child_node.data.get('final_annotations', []))}
                     
                     # Recursively add unique IDs to child annotations
                     self._add_unique_ids_and_children(
@@ -129,7 +129,7 @@ class AnnotationNode:
                     )
                     
                     # Add the processed children to this annotation
-                    annotation['children'] = child_result['annotation_response']
+                    annotation['children'] = child_result['final_annotations']
                     break
     
     def _extract_cell_type_from_nametag(self, child_nametag: str, parent_nametag: str) -> str:

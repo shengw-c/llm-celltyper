@@ -202,9 +202,6 @@ def prepare_subset_dataset(
         # "split" orientation is great because it's easy to reconstruct
         flow_matrices_json_ready[matrix_name] = matrix_df.to_dict(orient="split")
     
-    flow_matrices_json_ready = json.dumps(flow_matrices_json_ready, indent=2)
-    logger.debug(f"Flow matrices JSON ready (length: {len(flow_matrices_json_ready)} characters)")
-
     # Save adata
     subset_adata_file = os.path.join(data_folder, f"{nametag}_subset.h5ad")
     adata.write_h5ad(subset_adata_file, compression='gzip')

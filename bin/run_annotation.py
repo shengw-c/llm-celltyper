@@ -106,6 +106,7 @@ def run_annotation(
     llm_model_complicated: str = "gemini-2.5.pro",
     llm_max_retries: int = 3,
     llm_nreplies: int = 1,
+    llm_adaptive: bool = True,
     gsea_databases: str = "MSigDB_Hallmark_2020,KEGG_2021_Human",
     top_genes: int = 20,
     top_pathways: int = 20,
@@ -131,6 +132,7 @@ def run_annotation(
         llm_model_complicated: Name of the LLM model for complicated tasks (default: "gemini-2.5.pro").
         llm_nreplies: Number of replies to request from LLM (default: 1, used for cell type annotation).
         llm_max_retries: Maximum retries for LLM API calls (default: 3).
+        llm_adaptive: If True, only replicate annotations for Low/Medium confidence clusters (default: True).
         gsea_databases: Comma-separated list of gene set databases.
         top_genes: Number of top marker genes per cluster.
         top_pathways: Number of top pathways per cluster.
@@ -187,6 +189,7 @@ def run_annotation(
     logger.info(f"  LLM model (complicated): {llm_model_complicated}")
     logger.info(f"  LLM max retries: {llm_max_retries}")
     logger.info(f"  LLM nreplies: {llm_nreplies}")
+    logger.info(f"  LLM adaptive mode: {llm_adaptive}")
     logger.info(f"  GSEA databases: {gsea_databases}")
     logger.info(f"  Top genes: {top_genes}")
     logger.info(f"  Top pathways: {top_pathways}")
@@ -212,6 +215,7 @@ def run_annotation(
             llm_model_complicated=llm_model_complicated,
             llm_max_retries=llm_max_retries,
             llm_nreplies=llm_nreplies,
+            llm_adaptive=llm_adaptive,
             gsea_databases=gsea_databases,
             top_genes=top_genes,
             top_pathways=top_pathways,
@@ -268,6 +272,8 @@ def main():
         ('--llm-model-complicated', {'default': 'gemini-2.5.pro', 'help': 'LLM model name for complicated tasks (default: gemini-2.5.pro)'}),
         ('--llm-max-retries', {'type': int, 'default': 3, 'help': 'LLM max retries (default: 3)'}),
         ('--llm-nreplies', {'type': int, 'default': 1, 'help': 'Number of replies to request from LLM (default: 1)'}),
+        ('--llm-adaptive', {'action': 'store_true', 'default': True, 'help': 'Enable adaptive replication (only replicate low/medium confidence clusters)'}),
+        ('--no-llm-adaptive', {'action': 'store_false', 'dest': 'llm_adaptive', 'help': 'Disable adaptive replication (replicate all clusters)'}),
         ('--gsea-databases', {'default': 'MSigDB_Hallmark_2020,KEGG_2021_Human', 'help': 'Comma-separated list of gene set databases'}),
         ('--top-genes', {'type': int, 'default': 20, 'help': 'Number of top marker genes per cluster (default: 20)'}),
         ('--top-pathways', {'type': int, 'default': 20, 'help': 'Number of top pathways per cluster (default: 20)'}),
@@ -319,6 +325,7 @@ def main():
             llm_model_complicated=args.llm_model_complicated,
             llm_max_retries=args.llm_max_retries,
             llm_nreplies=args.llm_nreplies,
+            llm_adaptive=args.llm_adaptive,
             gsea_databases=args.gsea_databases,
             top_genes=args.top_genes,
             top_pathways=args.top_pathways,
@@ -343,6 +350,7 @@ def main():
             llm_model_complicated=args.llm_model_complicated,
             llm_max_retries=args.llm_max_retries,
             llm_nreplies=args.llm_nreplies,
+            llm_adaptive=args.llm_adaptive,
             gsea_databases=args.gsea_databases,
             top_genes=args.top_genes,
             top_pathways=args.top_pathways,
