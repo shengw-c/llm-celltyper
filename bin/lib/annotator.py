@@ -173,8 +173,8 @@ def annotate_cell_types(
     hierarchical_collector: Optional[HierarchicalAnnotation] = None,
     min_cells_for_subtype: int = 1000,
     condition_num: int = 1,
-    llm_model_general: str = "gemini-2.5-flash",
-    llm_model_complicated: str = "gemini-2.5.pro",
+    max_resolution: float = 1.0,
+    llm_model_general: str = "gemini-2.5-flash",    llm_model_complicated: str = "gemini-2.5.pro",
     llm_max_retries: int = 3,
     llm_nreplies: int = 1,
     llm_adaptive: bool = True,
@@ -251,9 +251,9 @@ def annotate_cell_types(
         batch_key=batch_key,
         integration=integration,
         working_dir=output_dir,
-        cpus=cpus_per_task
-    )
-    
+        cpus=cpus_per_task,
+        max_resolution=max_resolution
+    )    
     ## Determine the good resolution
     logger.info("Selecting optimal clustering resolution")
     cls_response = client.select_cluster_resolution(
@@ -448,6 +448,7 @@ def annotate_cell_types(
                 hierarchical_collector=hierarchical_collector,
                 min_cells_for_subtype=min_cells_for_subtype,
                 condition_num=condition_num,
+                max_resolution=max_resolution,
                 llm_model_general=llm_model_general,
                 llm_model_complicated=llm_model_complicated,
                 llm_max_retries=llm_max_retries,

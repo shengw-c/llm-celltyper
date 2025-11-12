@@ -29,12 +29,22 @@ def find_node_data(tree_dict: Dict, cell_name: str, raise_on_missing: bool = Fal
     Raises:
         TreeValidationError: If raise_on_missing=True and node is not found.
     """
-    # Check if the cell_name is a key in the current dictionary
+    # Try to find the cell_name with normalization (spaces vs underscores)
+    # First, check exact match
     if cell_name in tree_dict:
         return tree_dict[cell_name]
     
-    # If not, iterate through all nodes in this dictionary
-    # and search their children recursively
+    # Try with underscores instead of spaces
+    cell_name_underscored = cell_name.replace(' ', '_')
+    if cell_name_underscored in tree_dict:
+        return tree_dict[cell_name_underscored]
+    
+    # Try with spaces instead of underscores
+    cell_name_spaced = cell_name.replace('_', ' ')
+    if cell_name_spaced in tree_dict:
+        return tree_dict[cell_name_spaced]
+    
+    # If not found at this level, iterate through all nodes and search their children recursively
     for node_name, node_data in tree_dict.items():
         children_dict = node_data.get("children", {})
         

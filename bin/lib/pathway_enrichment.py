@@ -46,6 +46,9 @@ def get_top_enriched_pathways(
         prerank_input = ranked_genes_df[ranked_genes_df['group'] == cls][
             ['names', 'logfoldchanges']
         ]
+
+        ## upcase gene names for consistency
+        
         
         # Run GSEA Prerank
         try:

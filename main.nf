@@ -184,6 +184,7 @@ process SPLIT_DATASET {
         --output-dir . \\
         --min-cells ${params.min_cells} \\
         --condition-num ${params.condition_num} \\
+        --max-resolution ${params.max_resolution_initial} \\
         --llm-model-general "${params.llm_model_general}" \\
         --llm-model-complicated "${params.llm_model_complicated}" \\
         --llm-nreplies ${params.llm_nreplies} \\
@@ -251,6 +252,7 @@ process RUN_NESTED_ANNOTATION {
         --output-dir . \\
         --min-cells ${params.min_cells} \\
         --condition-num ${params.condition_num} \\
+        --max-resolution ${params.max_resolution_subsequent} \\
         --llm-model-general "${params.llm_model_general}" \\
         --llm-model-complicated "${params.llm_model_complicated}" \\
         --llm-nreplies ${params.llm_nreplies} \\

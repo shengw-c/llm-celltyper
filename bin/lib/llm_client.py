@@ -110,6 +110,12 @@ class CellTypeAnnotationClient:
                             substables[key] = dat.shape[0]
                 valid_stables = {key:value for key, value in stables.items() if value>=target_num_clusters}
                 valid_substables = {key:value for key, value in substables.items() if value>=target_num_clusters}
+                if not valid_stables and not valid_substables:
+                    ## try to relax the target number of clusters
+                    logger.info(f"No stable resolutions found meeting target of {target_num_clusters} clusters. Relaxing target criteria to only use {max(2, len(except_cell_types))} clusters.")
+                    valid_stables = {key:value for key, value in stables.items() if value>=max(2, len(except_cell_types))}
+                    valid_substables = {key:value for key, value in substables.items() if value>=max(2, len(except_cell_types))}
+
                 if valid_stables:
                     valid_stables = {float(key.split("_to_")[0].replace("leiden_", "").replace("_", ".")):value for key,value in valid_stables.items()}
                     sel_resolution = min(valid_stables.keys())
@@ -129,7 +135,11 @@ class CellTypeAnnotationClient:
                         "justification": f"Manual determination found substable resolution with {valid_substables[sel_resolution]} clusters, meeting target of {target_num_clusters}."
                     }
                 else:
+                    print("target:", target_num_clusters)
+                    print("stables:", stables)
+                    print("substables:", substables)
                     logger.info(f"Manual determination failed. Proceeding with LLM query.")
+                    raise ValueError("Manual determination did not find suitable resolution. Exiting...")
                     prompt = [
                         cluster_PROMPT.format(
                             cell_type_num=len(except_cell_types),
@@ -246,6 +256,7 @@ class CellTypeAnnotationClient:
             try:
                 initial_prompt = Celltyper_Instruction.format(
                     expr_context=context,
+                    parent_cell_type=str(parent_cell_type),
                     candidate_cell_types=json.dumps(candidate_cell_types),
                     marker_genes_json=json.dumps(marker_genes),
                     pathway_json=json.dumps(pathways),
@@ -301,6 +312,7 @@ class CellTypeAnnotationClient:
                         
                         new_prompt = Celltyper_Instruction.format(
                             expr_context=context,
+                            parent_cell_type=str(parent_cell_type),
                             candidate_cell_types=json.dumps(candidate_cell_types),
                             marker_genes_json=json.dumps(new_top_genes_by_specificity),
                             pathway_json=json.dumps(new_pathways),

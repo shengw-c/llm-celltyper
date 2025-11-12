@@ -32,7 +32,8 @@ def prepare_subset_dataset(
     batch_key: Optional[List[str]] = None, 
     integration: bool = False,
     working_dir: str = "work",
-    cpus: int = 16
+    cpus: int = 16,
+    max_resolution: float = 1.0
 ) -> Dict[str, str]:
     """
     Prepares a subset AnnData object based on specified cell IDs, performs normalization,
@@ -155,8 +156,8 @@ def prepare_subset_dataset(
     sc.tl.umap(adata)
 
     # Build leiden cluster trees using different resolutions
-    logger.info("Computing Leiden clusters at multiple resolutions")
-    resolutions = np.arange(0, 1, 0.05).round(2)
+    logger.info(f"Computing Leiden clusters at multiple resolutions up to {max_resolution}")
+    resolutions = np.arange(0, max_resolution, 0.05).round(2)
     for resolution in tqdm(resolutions, desc="Computing Leiden clusters"):
         sc.tl.leiden(
             adata,

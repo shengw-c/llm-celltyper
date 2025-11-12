@@ -60,6 +60,32 @@ def load_log_analysis(work_dir: str = "work") -> Optional[Dict]:
         return None
 
 
+def load_consolidated_annotations(results_dir: str) -> Optional[Dict]:
+    """
+    Load the consolidated annotations JSON if available.
+    
+    Args:
+        results_dir: Results directory containing annotation/consolidated_annotations.json
+    
+    Returns:
+        Dictionary containing consolidated annotations or None if not found
+    """
+    # Try annotation subdirectory first
+    consolidated_file = os.path.join(results_dir, "annotation", "consolidated_annotations.json")
+    
+    if not os.path.exists(consolidated_file):
+        # Try root of results directory
+        consolidated_file = os.path.join(results_dir, "consolidated_annotations.json")
+    
+    if os.path.exists(consolidated_file):
+        logger.info(f"Loading consolidated annotations from {consolidated_file}")
+        with open(consolidated_file, 'r') as f:
+            return json.load(f)
+    else:
+        logger.warning(f"Consolidated annotations file not found")
+        return None
+
+
 def collect_annotation_results(work_dir: str = "work") -> Dict[str, List[Dict[str, Any]]]:
     """
     Collect all annotation results from the work directory.
@@ -392,6 +418,7 @@ def render_tree_node(node: Dict[str, Any], depth: int = 0, first_active_ref: Lis
 def generate_html_summary(
     results: Dict[str, Any], 
     log_analysis: Optional[Dict],
+    consolidated_annotations: Optional[Dict] = None,
     output_file: str = "work/annotation_summary.html"
 ) -> None:
     """
@@ -400,6 +427,7 @@ def generate_html_summary(
     Args:
         results: Annotation results from collect_annotation_results.
         log_analysis: Log analysis results (optional).
+        consolidated_annotations: Consolidated annotations with cell_status and parent_cell_type (optional).
         output_file: Path to save the HTML file.
     """
     logger.info(f"Generating HTML summary: {output_file}")
@@ -706,6 +734,76 @@ def generate_html_summary(
         
         .annotations-table tr:hover {
             background: #f8f9fa;
+        }
+        
+        .editable-cell {
+            cursor: text;
+            min-width: 100px;
+            padding: 8px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+        
+        .editable-cell:hover {
+            background-color: #f0f8ff;
+        }
+        
+        .editable-cell:focus {
+            outline: 2px solid #667eea;
+            background-color: #fff;
+        }
+        
+        .editable-cell.edited {
+            background-color: #fff3cd;
+            border-left: 3px solid #ffc107;
+        }
+        
+        .export-button {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s;
+            z-index: 999;
+            display: none;
+        }
+        
+        .export-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+        
+        .export-button.visible {
+            display: block;
+        }
+        
+        .export-button .badge {
+            background: rgba(255, 255, 255, 0.3);
+            padding: 2px 8px;
+            border-radius: 12px;
+            margin-left: 8px;
+            font-size: 0.9em;
+        }
+        
+        .parent-info {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .parent-info strong {
+            color: #667eea;
+            font-size: 1.1em;
         }
         
         .confidence-badge {
@@ -1022,7 +1120,37 @@ def generate_html_summary(
                 
                 <div class="section">
                     <h2>🏷️ Cell Type Annotations</h2>
-                    <div class="info-grid">
+"""
+        
+        # Add parent cell type information
+        parent_cell_type = ''
+        
+        # If we have consolidated annotations, try to find parent info from there
+        if consolidated_annotations:
+            # Look for any annotation from this nametag to get parent info
+            for unique_id, ann_data in consolidated_annotations.items():
+                if ann_data.get('hierarchy_path', '') == nametag:
+                    parent_cell_type = ann_data.get('parent_cell_type', '')
+                    break
+        
+        # Fallback: Try to get from annotation_data
+        if not parent_cell_type:
+            parent_cell_type = annotation_data.get('parent_cell_type', '')
+        
+        # Fallback: Try to extract from nametag if not in annotation_data
+        if not parent_cell_type:
+            parts = nametag.split('_')
+            if len(parts) > 2:  # e.g., lev0_Immune_Cell_T_Cell
+                # Extract parent from nametag (everything except the last part)
+                parent_cell_type = ' '.join(parts[1:-1]) if len(parts) > 3 else parts[1].replace('_', ' ')
+        
+        if parent_cell_type and parent_cell_type != 'all types' and parent_cell_type != 'Root':
+            html_content += f"""                    <div class="parent-info">
+                        <strong>📍 Parent Cell Type:</strong> {parent_cell_type}
+                    </div>
+"""
+        
+        html_content += """                    <div class="info-grid">
                         <div class="info-item">
                             <div class="info-label">Context</div>
                             <div class="info-value">""" + annotation_data.get('general_context', 'N/A') + """</div>
@@ -1040,7 +1168,8 @@ def generate_html_summary(
                         <thead>
                             <tr>
                                 <th>Cluster ID</th>
-                                <th>Cell Type</th>
+                                <th>Cell Type (Editable)</th>
+                                <th>Cell Status</th>
                                 <th>Confidence</th>
                                 <th>Key Markers</th>
                                 <th>Justification</th>
@@ -1050,17 +1179,45 @@ def generate_html_summary(
 """
             
             for ann in annotations:
+                cluster_id = ann.get('cluster_id', 'N/A')
+                cell_type = ann.get('cell_type', 'N/A')
+                cell_status = 'N/A'  # Default
                 confidence = ann.get('confidence', 'Unknown')
-                confidence_class = f"confidence-{confidence.lower()}"
                 markers = ann.get('key_markers_cited', [])
+                justification = ann.get('justification', 'N/A')
+                unique_id_suffix = f"{nametag}_{cluster_id}"
+                
+                # Try to get enhanced data from consolidated_annotations if available
+                if consolidated_annotations:
+                    # Look for this annotation in consolidated annotations
+                    # Try to find by matching hierarchy_path and cluster_id
+                    for cons_id, cons_data in consolidated_annotations.items():
+                        if (cons_data.get('hierarchy_path', '') == nametag and 
+                            str(cons_data.get('cluster_id', '')) == str(cluster_id)):
+                            # Found matching entry, use its data
+                            cell_status = cons_data.get('cell_status', None) or 'N/A'
+                            cell_type = cons_data.get('cell_type', cell_type)
+                            confidence = cons_data.get('confidence', confidence)
+                            markers = cons_data.get('key_markers_cited', markers)
+                            justification = cons_data.get('justification', justification)
+                            unique_id_suffix = cons_data.get('unique_id', unique_id_suffix)
+                            break
+                
+                confidence_class = f"confidence-{confidence.lower()}"
                 markers_html = ''.join([f'<span class="marker-tag">{m}</span>' for m in markers])
                 
-                html_content += f"""                            <tr>
-                                <td><strong>{ann.get('cluster_id', 'N/A')}</strong></td>
-                                <td>{ann.get('cell_type', 'N/A')}</td>
+                html_content += f"""                            <tr data-unique-id="{unique_id_suffix}">
+                                <td><strong>{cluster_id}</strong></td>
+                                <td class="editable-cell" 
+                                    contenteditable="true" 
+                                    data-original-value="{cell_type}"
+                                    data-cluster-id="{cluster_id}"
+                                    onblur="handleCellEdit(this)"
+                                    onkeydown="handleCellKeydown(event, this)">{cell_type}</td>
+                                <td>{cell_status}</td>
                                 <td><span class="confidence-badge {confidence_class}">{confidence}</span></td>
                                 <td><div class="marker-list">{markers_html}</div></td>
-                                <td>{ann.get('justification', 'N/A')}</td>
+                                <td>{justification}</td>
                             </tr>
 """
             
@@ -1075,12 +1232,100 @@ def generate_html_summary(
     html_content += """        </div>
     </div>
     
+    <!-- Export Button -->
+    <button id="exportButton" class="export-button" onclick="exportChanges()">
+        💾 Export Changes<span class="badge" id="changeCount">0</span>
+    </button>
+    
     <div id="imageModal" class="modal" onclick="closeModal()">
         <span class="close">&times;</span>
         <img id="modalImage" src="">
     </div>
     
     <script>
+        // Track all edits
+        const editedCells = new Map(); // unique_id -> {original, updated}
+        
+        function handleCellEdit(cell) {
+            const uniqueId = cell.closest('tr').dataset.uniqueId;
+            const originalValue = cell.dataset.originalValue;
+            const newValue = cell.textContent.trim();
+            
+            if (newValue !== originalValue) {
+                // Mark cell as edited
+                cell.classList.add('edited');
+                
+                // Track the change
+                editedCells.set(uniqueId, {
+                    original: originalValue,
+                    updated: newValue
+                });
+            } else {
+                // Remove edit marker if value reverted to original
+                cell.classList.remove('edited');
+                editedCells.delete(uniqueId);
+            }
+            
+            // Update export button
+            updateExportButton();
+        }
+        
+        function handleCellKeydown(event, cell) {
+            // Prevent Enter key from creating new lines
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                cell.blur();
+            }
+            // Allow Escape key to revert changes
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                cell.textContent = cell.dataset.originalValue;
+                cell.blur();
+            }
+        }
+        
+        function updateExportButton() {
+            const button = document.getElementById('exportButton');
+            const badge = document.getElementById('changeCount');
+            const count = editedCells.size;
+            
+            badge.textContent = count;
+            
+            if (count > 0) {
+                button.classList.add('visible');
+            } else {
+                button.classList.remove('visible');
+            }
+        }
+        
+        function exportChanges() {
+            if (editedCells.size === 0) {
+                alert('No changes to export!');
+                return;
+            }
+            
+            // Create TSV content
+            let tsvContent = 'Unique_ID\\tOriginal_Cell_Type\\tUpdated_Cell_Type\\n';
+            
+            editedCells.forEach((change, uniqueId) => {
+                tsvContent += `${uniqueId}\\t${change.original}\\t${change.updated}\\n`;
+            });
+            
+            // Create download link
+            const blob = new Blob([tsvContent], { type: 'text/tab-separated-values' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'annotation_edits.tsv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            
+            // Notify user
+            alert(`Exported ${editedCells.size} changes to annotation_edits.tsv`);
+        }
+        
         function openTab(evt, tabName) {
             // Hide all tab contents
             const tabContents = document.getElementsByClassName("tab-content");
@@ -1121,7 +1366,7 @@ def generate_html_summary(
         
         // Close modal with Escape key
         document.addEventListener('keydown', function(event) {
-            if (event.key === 'Escape') {
+            if (event.key === 'Escape' && document.getElementById("imageModal").style.display === "block") {
                 closeModal();
             }
         });
@@ -1171,8 +1416,13 @@ def create_annotation_summary(work_dir: str = "work", output_file: str = "work/a
     # Load log analysis if available
     log_analysis = load_log_analysis(work_dir)
     
+    # Load consolidated annotations if available
+    # Try to find results directory (usually parent of work_dir)
+    results_dir = os.path.dirname(work_dir) if work_dir != "work" else "."
+    consolidated_annotations = load_consolidated_annotations(results_dir)
+    
     # Generate HTML summary
-    generate_html_summary(results, log_analysis, output_file)
+    generate_html_summary(results, log_analysis, consolidated_annotations, output_file)
     
     return output_file
 

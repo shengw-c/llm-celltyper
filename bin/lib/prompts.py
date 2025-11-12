@@ -37,45 +37,39 @@ First, establish two key target numbers based on your inputs:
 2.  **Selection Target:** This is your *ideal* cluster count.
     * `selection_target` = `min({cell_type_num} + {condition_num}, {cell_type_num}+{cell_type_num})`
 
-### Step 2: Identify and Filter Plateaus
-Second, you **MUST** identify all "plateaus" (stable clustering ranges) from the JSON data.
+### Step 2: Identify All Plateaus
+Second, you **MUST** generate a complete list of all stable and substable plateaus.
 
 1.  **Reconstruct Cluster Counts:**
     * First, create a master list of all resolutions and their total cluster counts.
     * You can find the cluster count for a resolution by checking the `index` or `columns` list length (e.g., in "leiden_0_55_to_leiden_0_6", the count for 0.55 is `len(index)` and the count for 0.6 is `len(columns)`).
     * This gives you a mapping like: `{{0.55: 10, 0.6: 12, 0.65: 12, 0.7: 12, ...}}`.
 
-2.  **Identify All Plateaus:**
-    * Use the **"JSON Interpretation Rules" (Section 4)** to determine if a transition is "stable" or "substable".
-    * A plateau is a contiguous range of resolutions where all transitions are of the *same* status (e.g., all "stable" or all "substable"). A "stable" transition breaks a "substable" plateau, and vice-versa.
-    * Create a list of all found plateaus. Each plateau should be stored with its `cluster_count`, its `end_resolution` (the *last* resolution in that stable range), and `stable_status` ('stable' or 'substable').
+2.  **Determine Transition Status:**
+    * For each transition in the input JSON, determine its status ('stable', 'substable', or 'unstable') by applying the **"JSON Interpretation Rules" in Section 4**.
+
+3.  **Generate Plateau List (`All_Plateaus`):**
+    * Iterate through the resolutions in ascending order to build a list of every contiguous plateau.
+    * A plateau is a range of resolutions where all transitions have the same status.
+    * An 'unstable' transition or a change in status ends the current plateau and begins a new one.
+    * Store each plateau as an object with its `cluster_count`, its `end_resolution` (the *last* resolution in that stable range), and `stable_status` ('stable' or 'substable').
     * Example: `All_Plateaus = [{{'count': 12, 'end_res': 0.7, 'stable_status': 'substable'}}, {{'count': 15, 'end_res': 0.85, 'stable_status': 'stable'}}, ...]`
 
-3.  **Create Filtered Plateau Lists:**
-    * From `All_Plateaus`, create two new lists:
-    * `Stable_Valid_Plateaus`: Contains **only** plateaus where:
-        * `cluster_count >= min_target`
-        * AND `stable_status == 'stable'`
-    * `Substable_Valid_Plateaus`: Contains **only** plateaus where:
-        * `cluster_count >= min_target`
-        * AND `stable_status == 'substable'`
-
 ### Step 3: Select the Optimal Plateau (Strict Hierarchy)
-
-You **MUST** follow this selection priority.
+Third, you **MUST** follow this selection priority using the `All_Plateaus` list generated in Step 2.
 
 **Priority 1: Select the Closest *Stable* Valid Plateau**
-* **Condition:** This rule applies if the `Stable_Valid_Plateaus` list (from Step 2.3) is **NOT empty**.
+* **Condition:** First, create a `Stable_Valid_Plateaus` list by filtering `All_Plateaus` for plateaus where `stable_status == 'stable'` AND `cluster_count >= min_target`. This priority applies if this list is **NOT empty**.
 * **Action:** You **MUST** examine all plateaus in the `Stable_Valid_Plateaus` list. For each plateau, calculate the absolute difference: `abs(cluster_count - selection_target)`. You **MUST** select the plateau with the **minimum absolute difference**.
 * **Tie-Breaker:** If two valid plateaus have the *same* minimum absolute difference (e.g., `selection_target` is 7, and you have valid plateaus with 6 and 8 clusters), you **MUST** select the one with the **larger** cluster count (in the example, the 8-cluster plateau).
 
 **Priority 2: Fallback to *Substable* Valid Plateaus**
-* **Condition:** This rule applies **ONLY IF** the `Stable_Valid_Plateaus` list (from Priority 1) was **empty** AND the `Substable_Valid_Plateaus` list (from Step 2.3) is **NOT empty**.
+* **Condition:** This rule applies **ONLY IF** Priority 1 did not yield a result. Create a `Substable_Valid_Plateaus` list by filtering `All_Plateaus` for plateaus where `stable_status == 'substable'` AND `cluster_count >= min_target`. This priority applies if this list is **NOT empty**.
 * **Action:** You **MUST** examine all plateaus in the `Substable_Valid_Plateaus` list. For each plateau, calculate the absolute difference: `abs(cluster_count - selection_target)`. You **MUST** select the plateau with the **minimum absolute difference**.
 * **Tie-Breaker:** Apply the same tie-breaker rule as in Priority 1 (select the larger cluster count).
 
 **Priority 3: Fallback (If No Valid Plateaus Exist)**
-* **Condition:** This rule applies **ONLY IF** *both* the `Stable_Valid_Plateaus` and `Substable_Valid_Plateaus` lists (from Priority 1 and 2) were **empty**.
+* **Condition:** This rule applies **ONLY IF** no plateaus were selected in Priority 1 or 2.
 * **Action:** In this specific case, you **MUST** ignore the `min_target` rule. You **MUST** examine all plateaus in the original `All_Plateaus` list. For each, calculate the absolute difference: `abs(cluster_count - selection_target)`. You **MUST** select the plateau with the **minimum absolute difference**.
 * **Tie-Breaker:** If two plateaus have the *same* minimum absolute difference, you **MUST** pick the one in this strict priority order: (1) `'stable_status'=='stable'`, then (2) `'stable_status'=='substable'`, then (3) the one with the **larger** `cluster_count`.
 
@@ -130,23 +124,25 @@ You will be provided with the following data:
 
 1.  **Data context:** A keyword or a short sentence describing the experiment design or tissue type.
     {expr_context}
+
+2.  **Parent Cell Type Context:** The parent lineage for the current annotation task. This is `{parent_cell_type}`.
     
-2.  **Candidate Cell Types:** A JSON object detailing the candidate cell types. The data for each candidate cell type includes its definition and whether it has child cell types.
+3.  **Candidate Cell Types:** A JSON object detailing the candidate cell types. The data for each candidate cell type includes its definition and whether it has child cell types.
     ```json
     {candidate_cell_types}
     ```
 
-3.  **Cluster Marker Genes:** A JSON object detailing the top 10 marker genes for each cluster. The data for each gene includes its average log2 fold-change (`logfoldchanges`), adjusted p-value, and the difference in expression percentage between this cluster and all other clusters (`pct_diff`).
+4.  **Cluster Marker Genes:** A JSON object detailing the top 10 marker genes for each cluster. The data for each gene includes its average log2 fold-change (`logfoldchanges`), adjusted p-value, and the difference in expression percentage between this cluster and all other clusters (`pct_diff`).
     ```json
     {marker_genes_json}
     ```
 
-4.  **Cluster Enriched Pathways:** A JSON object listing the top 10 enriched pathways from GSEA for each cluster.
+5.  **Cluster Enriched Pathways:** A JSON object listing the top 10 enriched pathways from GSEA for each cluster.
     ```json
     {pathway_json}
     ```
 
-5.  **Cluster Adjacency:** A JSON object showing the adjacency matrix among clusters. The values in each cell represent the **neighborhood connectivity strength** between clusters, indicating their biological relatedness and potential for a continuous relationship.
+6.  **Cluster Adjacency:** A JSON object showing the adjacency matrix among clusters. The values in each cell represent the **neighborhood connectivity strength** between clusters, indicating their biological relatedness and potential for a continuous relationship.
     ```json
     {cluster_adjacency_json}
     ```
@@ -175,16 +171,33 @@ For each cluster provided, you must perform the following steps sequentially:
         * If a best-fitting cell type from the `Candidate Cell Types` list is identified (including via the Roll-up Rule), your final `cell_type_hypothesis` **MUST** be that exact string.
         * If no candidate cell type can be confidently assigned, you **MUST** label the `cell_type_hypothesis` as **"Unknown"**.
     * **2e. Assign Alternative Hypothesis (The Expert Escape Hatch):**
-        * This rule applies **ONLY** if the `cell_type_hypothesis` is **'Unknown'** (per Rule 2d).
-        * If the data strongly points to a cell type name that is **NOT** present in the `Candidate Cell Types` list, AND is **NOT** a known subtype of any candidate in the list (as this would be a "Parent-Child Roll-up" per Rule 2d), and the computed confidence is **'High'**, you **MUST** use that name for the `alternative_hypothesis` field.
-        * This rule is your "expert escape hatch" to identify a cell type from a *different lineage* that was missing from the candidates. Your goal here is to provide the *most precise and accurate* cell type possible based on your expert knowledge, not a broad category.
-        * Otherwise, this field **MUST** be `null`. (This prevents proposing 'CD4 T cell' if 'T cell' was a candidate).
+        * **Trigger:** This rule is **ONLY** executed if the `cell_type_hypothesis` is **'Unknown'** (per Rule 2d).
+        * **Action:** You **MUST** attempt to find an `alternative_hypothesis` by evaluating the evidence in the following priority order. Once a priority level yields a result, you **MUST STOP** and not proceed to the next.
+        * **Priority 1: Check for Altered State.**
+            * **Goal:** Determine if the cluster is a candidate cell type confounded by a strong functional state.
+            * **Evaluation:** If the cluster's markers are a partial match for one of the `Candidate Cell Types` but are also confounded by a strong functional state (e.g., 'Stressed', 'Proliferating'), this priority is met.
+            * **Result:** If this priority is met, you **MUST**:
+                1. Set the `alternative_hypothesis` to the base candidate cell type name (e.g., "AT1 Cell").
+                2. Set the `cell_status` field to the identified state (e.g., "Stressed").
+                3. The `justification` must explain this reasoning (e.g., "Hypothesis is 'Unknown' because the 'Stressed' state confounded the direct match, but the likely base identity is 'AT1 Cell'.").
+        * **Priority 2: Check for Related, Unlisted Subtype.**
+            * **Trigger:** This priority is **ONLY** executed if Priority 1 did not yield a result.
+            * **Condition:** A `{parent_cell_type}` must be provided (i.e., it is not 'None').
+            * **Evaluation:** If the evidence points to a cell type that belongs to the same lineage as the `{parent_cell_type}` but was not included in the `Candidate Cell Types` list, this priority is met.
+            * **Result:** If this priority is met, you **MUST** propose the identified related subtype as the `alternative_hypothesis`.
+        * **Priority 3: Check for Different Lineage.**
+            * **Trigger:** This priority is **ONLY** executed if the first two priorities did not yield a result.
+            * **Condition:** If a `{parent_cell_type}` was provided (i.e., it is not 'None'), you may only proceed if the available marker genes **clearly conflict** with that parent lineage. If no parent was provided, you may proceed without this check.
+            * **Evaluation:** If the conditions are met, determine if the evidence strongly points to a precise cell type from a completely different lineage.
+            * **Result:** If a different lineage is identified with high confidence, you **MUST** propose that cell type in the `justification` and set `alternative_hypothesis` as `null`.
+        * **Final Fallback:** If none of these priorities yield a high-confidence result, the `alternative_hypothesis` **MUST** be `null`.
 
-3.  **Write Justification:** Your justification must be a concise, scientific explanation.
-    * **If `cell_type_hypothesis` is NOT "Unknown" (Rule 2d):** Cite the key positive marker genes, pathways, and adjacency evidence that support the primary hypothesis.
-    * **Parent-Child Roll-up Justification:** If you applied the **Parent-Child Roll-up Rule** (2d), you **MUST** state this. (e.g., "Assigned to parent 'T cell' based on CD3D. Specific markers (CD4, IL7R) indicate this is a CD4+ T cell subtype, which is rolled up to the provided candidate.").
-    * **If `cell_type_hypothesis` is "Unknown" AND `alternative_hypothesis` is NOT `null` (Rule 2e):** The justification **MUST** explain that the primary hypothesis is "Unknown" because the correct name (a different lineage) is missing from the candidate list, and then clearly state that the `alternative_hypothesis` is the appropriate name, citing the specific evidence.
-    * **Cell Status Note:** If a cell status was identified (per Rule 4), you **MUST** note this in the justification (e.g., "Furthermore, the cluster shows a stressed cell status...").
+3.  **Write Justification (Token Optimization Rule):** You MUST follow these rules based on the `confidence` score.
+    * **For "High" confidence annotations:** Your justification MUST be concise. Start with "High confidence: " and cite the key supporting evidence (e.g., "High confidence: canonical markers (CD3D, CD4) and adjacency to other T cells.").
+    * **For "Medium" or "Low" confidence annotations:** Your justification MUST be a detailed scientific explanation. Explain the ambiguity, conflicting evidence, or reasons for the lower confidence.
+    * **Parent-Child Roll-up Rule:** If this rule was used, you MUST mention it (e.g., "...rolled up to parent 'T cell'.").
+    * **Alternative Hypothesis:** If an `alternative_hypothesis` is given, the justification MUST explain why the primary hypothesis was "Unknown" and what evidence supports the alternative.
+    * **Cell Status Note:** If a `cell_status` is assigned, you MUST note this (e.g., "Cell status 'Proliferating' identified based on MKI67.").
     * All cited markers **MUST** be added to the `key_markers_cited` array.
 
 4.  **Assign Cell Status:**
@@ -194,6 +207,7 @@ For each cluster provided, you must perform the following steps sequentially:
     * This status information **MUST NOT** alter the `cell_type_hypothesis` value.
 
 5.  **Assign Confidence Score:** Assign a confidence level based on these **strict** criteria:
+    * **Special Proviso for "Unknown":** If the `cell_type_hypothesis` is "Unknown" **AND** `alternative_hypothesis` is `null`, the confidence **MUST** be "Low".
     * **Criteria:** You **MUST** assign the confidence level based on the *strength of the evidence* supporting your final conclusion (whether that is the `cell_type_hypothesis` or the `alternative_hypothesis`).
     * **`High`**: The cluster expresses multiple well-established, canonical markers for the assigned cell type with high specificity (high `logfoldchanges` and `pct_diff`). The evidence is unambiguous and often supported by adjacency or pathway data.
     * **`Medium`**: The cluster expresses one or two strong markers, but other canonical markers may be missing or weakly expressed. Adjacency data may be ambiguous.
@@ -257,12 +271,12 @@ You will be provided with three pieces of data:
     {expert_justifications}
     ```
 
-2.  **Candidate Cell Types (Tier 1):** A JSON object detailing the primary candidate cell types for reference. The data for each candidate includes its definition and whether it has child cell types.
+2.  **Candidate Cell Types:** A JSON object detailing the primary candidate cell types for reference. The data for each candidate includes its definition and whether it has child cell types.
     ```json
     {candidate_cell_types}
     ```
 
-3.  **Parent Cell Type (Tier 2):** (Optional) A single string keyword (e.g., "Epithelial Cell" or `None` for no parent) for reference in case of Tier 1 conflict.
+3.  **Parent Cell Type:** (Optional) A single string keyword (e.g., "Epithelial Cell" or `None` for no parent) for reference in case of Tier 1 conflict.
     ```json
     {parent_cell_type}
     ```
@@ -277,39 +291,48 @@ For each cluster, you **MUST** perform the following steps:
 3.  **Handle Disagreement (The PI's Decision):**
     * If experts disagree, you **MUST** act as the tie-breaker.
     * You **MUST** prioritize justifications that are supported by stronger, more canonical evidence (e.g., specific marker genes, key pathways).
-4.  **Form Final Justification:** Your final `justification` field **MUST** synthesize your findings.
-    * If consensus was reached, state the consensus and the key evidence.
-    * If you handled disagreement, explain the conflict and *why* you sided with a specific conclusion.
-    * **Tiered Logic Justification:** Your justification **MUST** clearly state which Tier of logic (1, 2, or 3) led to the final assignment (per Rule 6).
-    * **Cell Status Note:** If a consensus on cell status (e.g., 'Stressed') is found (per Rule 7), you **MUST** note this in the justification.
-5.  **Determine Interim Cell Type:**
-    * Based on your analysis (Rules 1-3), determine the most accurate formal cell type name (e.g., "CD4+ T cell", "Epithelial Cell", "Macrophage"). This is your *interim* consensus.
-    * If the evidence is overwhelmingly conflicting or insufficient, the interim cell type is **"Unknown"**.
-6.  **Apply Tiered Logic (Final Annotation):**
-    * You **MUST** now process your *interim* cell type from Rule 5 using this tiered logic.
-    * **6a. Tier 1: Check `Candidate Cell Types`:**
-        * **Action:** Check your interim cell type against the `Candidate Cell Types` list.
-        * **Case 1 (Direct Match):** If your interim type (e.g., "T cell") is an **exact match** for a type *in the candidate list*, assign "T cell" as the final `cell_type` and **STOP**. Proceed to Rule 7.
-        * **Case 2 (Child Roll-up):** If your interim type (e.g., "CD4+ T cell") is a known **subtype** of a type *in the candidate list* (e.g., "T cell"), assign the parent type ("T cell") as the final `cell_type` and **STOP**. Proceed to Rule 7.
-        * **On Mismatch:** If neither Case 1 nor Case 2 applies (e.g., the interim type is "Epithelial Cell" or "Macrophage"), proceed to Tier 2.
-    * **6b. Tier 2: Check `Parent Cell Type` (On Conflict):**
-        * **Trigger:** This step is **ONLY** executed if Tier 1 resulted in a mismatch **AND** the `{parent_cell_type}` input was provided (and is not `null` or 'None').
-        * **Action:** Check if your interim cell type (e.g., "Epithelial Cell") is a strong match for *the single keyword* provided in the `{parent_cell_type}` input.
-        * **Result:** If yes, assign this parent type ("Epithelial Cell") as the final `cell_type` and **STOP**. Proceed to Rule 7.
-        * **On Mismatch:** If no match is found, or `{parent_cell_type}` was not provided, proceed to Tier 3.
-    * **6c. Tier 3: Final Fallback:**
-        * **Trigger:** This step is **ONLY** executed if both Tier 1 and Tier 2 failed to produce a match.
-        * **Case 1 (Different Lineage):** If your interim type (e.g., "Macrophage") is a valid type but not in the Tier 1 or Tier 2 hierarchies, assign your interim type ("Macrophage") as the final `cell_type`.
-        * **Case 2 (Unknown):** If your interim type was "Unknown", the final `cell_type` remains **"Unknown"**.
-7.  **Assign Cell Status:**
-    * Review all expert justifications for a consensus on cell *status* (e.g., 'Proliferating', 'Stressed', 'Activated').
-    * If a clear consensus for a status exists, set the `cell_status` field to that value (e.g., "Stressed").
-    * If there is no consensus or no mention of status, this field **MUST** be `null`.
-8.  **Assign Confidence Score:**
-    * Assign a confidence level based on the *strength of the evidence* and *degree of expert consensus*.
-    * **`High`**: A clear consensus was reached, supported by strong canonical evidence.
-    * **`Medium`**: Experts disagreed, but the evidence you used to break the tie was strong. Or, consensus was based on weaker (e.g., non-canonical) markers.
-    * **`Low`**: Experts were highly conflicted, and evidence was ambiguous, forcing an "Unknown" assignment.
+
+4.  **Synthesize Interim Conclusion:**
+    * Based on your analysis of all expert justifications (Rules 1-3), first determine if the consensus points to a specific functional state (e.g., 'Stressed', 'Proliferating'). This is your `interim_status`.
+    * Next, synthesize all evidence to determine the single most accurate `interim_hypothesis` for the cluster's identity.
+
+5.  **Apply Tiered Annotation Logic:**
+    * You **MUST** now process your `interim_hypothesis` and `interim_status` using this tiered logic to determine the final `cell_type` and `cell_status`. Once a Tier yields a result, you **MUST STOP**.
+
+    *   **Tier 1: Check for Direct Match in Candidates.**
+        *   **Evaluation:** If the `interim_hypothesis` is an **exact match** for a name in the `Candidate Cell Types` list.
+        *   **Result:** If yes, assign the `interim_hypothesis` as the final `cell_type` and **STOP**.
+
+    *   **Tier 2: Check for Altered State.**
+        *   **Trigger:** If Tier 1 fails.
+        *   **Evaluation:** Determine if the `interim_hypothesis` is 'Unknown' or conflicting *because* of a strong functional state (the `interim_status` you found).
+        *   **Result:** If yes, assign the most likely base cell type as the final `cell_type` and the `interim_status` as the final `cell_status`. For example, if the interim conclusion was "conflicted, likely AT2 but with stress markers", the result is `cell_type`: "AT2 Cell", `cell_status`: "Stressed". **STOP**.
+
+    *   **Tier 3: Check for New, Related Subtype.**
+        *   **Trigger:** If previous tiers fail.
+        *   **Evaluation:** Determine if the `interim_hypothesis` represents a specific subtype that belongs to the `{parent_cell_type}` lineage but was not in the `Candidate Cell Types` list.
+        *   **Result:** If yes, and the evidence for this specific name is strong, assign the specific `interim_hypothesis` (e.g., "Gamma-delta T cell") as the final `cell_type`. This is preferred over rolling up to a less specific name. **STOP**.
+
+    *   **Tier 4: Check for Parent Roll-up.**
+        *   **Trigger:** If previous tiers fail.
+        *   **Evaluation:** Determine if the `interim_hypothesis` is a known subtype of a type in the `Candidate Cell Types` list (e.g., interim is "CD4 T cell", candidate is "T cell").
+        *   **Result:** If yes, assign the parent candidate ("T cell") as the final `cell_type`. **STOP**.
+
+    *   **Tier 5: Check for Different Lineage (with Safeguard).**
+        *   **Trigger:** If all previous tiers fail.
+        *   **Condition:** If a `{parent_cell_type}` was provided (and is not `null` or 'None'), you may only assign a different lineage if the evidence in the justifications **clearly conflicts** with the `{parent_cell_type}` lineage.
+        *   **Result:** If the condition is met (or if no parent was provided), assign the `interim_hypothesis` as the final `cell_type`. Otherwise, the final `cell_type` **MUST** be "Unknown".
+
+6.  **Form Final Justification (Token Optimization Rule):**
+    * **For "High" confidence annotations:** Your justification MUST be concise. It MUST start with "Consensus reached: " and MUST explicitly mention which Tier was used. (e.g., "Consensus reached: 'T cell' via Tier 4 (Parent Roll-up) based on expert consensus on CD4+ T cell markers.").
+    * **For "Medium" or "Low" confidence annotations:** Your justification MUST be a more detailed synthesis, explaining the expert disagreement or ambiguity and how you resolved it, and it MUST explicitly mention the Tier used.
+
+7.  **Assign Final Confidence Score:**
+    *   **Special Proviso for "Unknown":** If the final `cell_type` is "Unknown", the confidence **MUST** be "Low".
+    *   Assign a confidence level based on the *strength of the evidence* and *degree of expert consensus*.
+    *   **`High`**: A clear consensus was reached, supported by strong canonical evidence, and the assignment was straightforward (e.g., Tier 1, Tier 2).
+    *   **`Medium`**: Experts disagreed, but the evidence you used to break the tie was strong, or a more complex tier (e.g., Tier 3, 5) was required.
+    *   **`Low`**: Experts were highly conflicted, and evidence was ambiguous, forcing an "Unknown" assignment.
 
 ---
 
@@ -320,7 +343,7 @@ Use **only** the following field names:
 
 * **`cluster_id`:** **MUST** match the keys from the input data (e.g., "0", "1").
 * **`cell_type`:** The final cell type name after applying the Tiered Logic (e.g., "T cell", "Macrophage", "Unknown").
-* **`justification`:** Your clear and scientific synthesis, **explicitly mentioning which Tier (1, 2, or 3) was used** and noting any cell status.
+* **`justification`:** Your clear and scientific synthesis, **explicitly mentioning which Tier was used** and noting any cell status.
 * **`cell_status`:** The consensus cell status (e.g., "Stressed") or `null`.
 * **`confidence`:** Your assigned confidence score: "High", "Medium", or "Low".
 
@@ -331,36 +354,22 @@ This is an example of the required output format.
   {{
     "cluster_id": "0",
     "cell_type": "T cell",
-    "justification": "All experts reached a consensus on 'CD4+ T cell' based on canonical markers CD3D, CD4, and IL7R. As per the Tier 1 (Case 2: Child Roll-up) Rule, this is a subtype of the provided candidate 'T cell', which is assigned as the final cell type.",
+    "justification": "All experts reached a consensus on 'CD4+ T cell' based on canonical markers CD3D, CD4, and IL7R. As per Tier 4 logic (Parent Roll-up), this is a subtype of the provided candidate 'T cell', which is assigned as the final cell type.",
     "cell_status": null,
     "confidence": "High"
   }},
   {{
     "cluster_id": "1",
     "cell_type": "Unknown",
-    "justification": "Experts were conflicted. Expert 1 proposed 'Macrophage' (citing CD68), but expert 2 proposed 'Dendritic Cell' (citing CD1C). The evidence is ambiguous and key lineage markers are missing, preventing a high-confidence consensus. Tiered logic failed to find a match. Therefore, this cluster is set to 'Unknown' per Tier 3 logic.",
+    "justification": "Experts were conflicted. Expert 1 proposed 'Macrophage' (citing CD68), but expert 2 proposed 'Dendritic Cell' (citing CD1C). The evidence is ambiguous and key lineage markers are missing. Tier 5 fallback logic applied, but lineage conflict with parent was not met. Therefore, this cluster is set to 'Unknown'.",
     "cell_status": null,
     "confidence": "Low"
   }},
   {{
     "cluster_id": "2",
-    "cell_type": "Macrophage",
-    "justification": "Experts 1 and 2 provided strong, consensus evidence for 'Macrophage' citing CD68 and MRC1. This cell type did not match Tier 1 or Tier 2 hierarchies. Assigned 'Macrophage' per Tier 3 (Case 1: Different Lineage) fallback logic. Experts also noted a stressed status.",
+    "cell_type": "Stressed Macrophage",
+    "justification": "Experts' consensus was 'Macrophage' citing CD68 and MRC1, but noted strong stress signatures. Assigned 'Macrophage' with status 'Stressed' per Tier 2 logic.",
     "cell_status": "Stressed",
-    "confidence": "High"
-  }},
-  {{
-    "cluster_id": "3",
-    "cell_type": "Epithelial Cell",
-    "justification": "Experts' consensus was 'Epithelial Cell' citing KRT8/KRT18. This did not match Tier 1 candidates (AT1, AT2). Assigned 'Epithelial Cell' per Tier 2 parent keyword logic, which is a strong fit.",
-    "cell_status": null,
-    "confidence": "High"
-  }},
-  {{
-    "cluster_id": "4",
-    "cell_type": "B cell",
-    "justification": "Experts reached a clear consensus on 'B cell' citing MS4A1. This is an exact match for a provided candidate. Assigned 'B cell' per Tier 1 (Case 1: Direct Match) logic.",
-    "cell_status": null,
     "confidence": "High"
   }}
 ]

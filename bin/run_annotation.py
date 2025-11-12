@@ -55,10 +55,24 @@ def prepare_cell_type_config(tree_file: str, cell_type_name: str):
     with open(tree_file, 'r') as f:
         cell_tree = json.load(f)
     
-    if cell_type_name not in cell_tree:
-        raise ValueError(f"Cell type '{cell_type_name}' not found in tree file")
+    # Normalize cell type name for lookup - try original, then with underscores, then with spaces
+    # This handles different JSON formats (some use spaces, some use underscores)
+    lookup_key = None
+    if cell_type_name in cell_tree:
+        lookup_key = cell_type_name
+    elif cell_type_name.replace(' ', '_') in cell_tree:
+        lookup_key = cell_type_name.replace(' ', '_')
+    elif cell_type_name.replace('_', ' ') in cell_tree:
+        lookup_key = cell_type_name.replace('_', ' ')
     
-    cell_data = cell_tree[cell_type_name]
+    if lookup_key is None:
+        available_keys = ', '.join(list(cell_tree.keys())[:5])
+        raise ValueError(
+            f"Cell type '{cell_type_name}' not found in tree file. "
+            f"Available keys (first 5): {available_keys}..."
+        )
+    
+    cell_data = cell_tree[lookup_key]
     
     # Import get_immediate_children from lib
     from lib.tree_utils import get_immediate_children
@@ -100,10 +114,10 @@ def run_annotation(
     integration: bool = False,
     cpus_per_task: int = 16,
     output_dir: str = ".",
-    min_cells_for_subtype: int = 1000,
-    condition_num: int = 1,
-    llm_model_general: str = "gemini-2.5-flash",
-    llm_model_complicated: str = "gemini-2.5.pro",
+            min_cells_for_subtype: int = 1000,
+            condition_num: int = 1,
+            max_resolution: float = 1.0,
+            llm_model_general: str = "gemini-2.5-flash",    llm_model_complicated: str = "gemini-2.5.pro",
     llm_max_retries: int = 3,
     llm_nreplies: int = 1,
     llm_adaptive: bool = True,
@@ -211,6 +225,7 @@ def run_annotation(
             hierarchical_collector=None,
             min_cells_for_subtype=min_cells_for_subtype,
             condition_num=condition_num,
+            max_resolution=max_resolution,
             llm_model_general=llm_model_general,
             llm_model_complicated=llm_model_complicated,
             llm_max_retries=llm_max_retries,
@@ -268,6 +283,7 @@ def main():
         ('--output-dir', {'default': 'work', 'help': 'Output directory (default: work)'}),
         ('--min-cells', {'type': int, 'default': 1000, 'help': 'Minimum cells for subtype annotation (default: 1000)'}),
         ('--condition-num', {'type': int, 'default': 1, 'help': 'Number of expected condition-driven groups or artifacts (default: 1)'}),
+        ('--max-resolution', {'type': float, 'default': 1.0, 'help': 'Maximum resolution for Leiden clustering.'}),
         ('--llm-model-general', {'default': 'gemini-2.5-flash', 'help': 'LLM model name for general purpose (default: gemini-2.5-flash)'}),
         ('--llm-model-complicated', {'default': 'gemini-2.5.pro', 'help': 'LLM model name for complicated tasks (default: gemini-2.5.pro)'}),
         ('--llm-max-retries', {'type': int, 'default': 3, 'help': 'LLM max retries (default: 3)'}),
@@ -321,6 +337,7 @@ def main():
             output_dir=args.output_dir,
             min_cells_for_subtype=args.min_cells,
             condition_num=args.condition_num,
+            max_resolution=args.max_resolution,
             llm_model_general=args.llm_model_general,
             llm_model_complicated=args.llm_model_complicated,
             llm_max_retries=args.llm_max_retries,
@@ -346,6 +363,7 @@ def main():
             output_dir=args.output_dir,
             min_cells_for_subtype=args.min_cells,
             condition_num=args.condition_num,
+            max_resolution=args.max_resolution,
             llm_model_general=args.llm_model_general,
             llm_model_complicated=args.llm_model_complicated,
             llm_max_retries=args.llm_max_retries,
