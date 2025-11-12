@@ -48,7 +48,7 @@ def get_top_enriched_pathways(
         ]
 
         ## upcase gene names for consistency
-        
+        prerank_input["names"] = prerank_input["names"].str.upper()
         
         # Run GSEA Prerank
         try:
