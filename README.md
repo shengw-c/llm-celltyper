@@ -38,15 +38,16 @@ firefox results/annotation_summary.html
 ### Using Python Directly
 
 ```python
-from cell_annotator import celltype_annotor
+from bin.lib.annotator import annotate_cell_types
 
-celltype_annotor(
+collector = annotate_cell_types(
     expected_cells=my_cells,
     tree_file="data/lung.json",
     general_context="lung tissue",
     nametag="lev0",
     input_file="data/test.h5ad",
     batch_key=["batch"],
+    integration=False,
     cpus_per_task=16
 )
 ```

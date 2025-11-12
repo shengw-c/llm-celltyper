@@ -22,19 +22,21 @@ The pipeline now supports comprehensive LLM configuration through `nextflow.conf
 ```groovy
 params {
     // LLM Model Configuration
-    llm_model = "gemini-2.0-flash-exp"  // Model name
-    llm_temperature = 0.1                // Temperature (0.0-1.0)
-    llm_max_retries = 3                  // Max retry attempts
-    llm_timeout = 120                    // Timeout in seconds
+    llm_model_general = "gemini-2.5-flash"      // Model for simpler tasks
+    llm_model_complicated = "gemini-2.5-pro"    // Model for complex tasks
+    llm_temperature = 0.1                       // Temperature (0.0-1.0)
+    llm_max_retries = 3                         // Max retry attempts
+    llm_timeout = 120                           // Timeout in seconds
 }
 ```
 
 ### Supported Models
 
 #### Google Gemini (Default - Currently Supported)
-- `gemini-2.0-flash-exp` (default, fastest)
-- `gemini-1.5-pro` (more capable)
-- `gemini-1.5-flash` (balanced)
+- `gemini-2.5-flash` (default for general tasks, fastest)
+- `gemini-2.5-pro` (default for complicated tasks, more capable)
+- `gemini-1.5-pro` (previous generation, more capable)
+- `gemini-1.5-flash` (previous generation, balanced)
 
 #### Future Support (Requires Adapter Implementation)
 - OpenAI: `gpt-4`, `gpt-4-turbo`, `gpt-3.5-turbo`
@@ -48,7 +50,8 @@ You can override LLM settings when running the pipeline:
 nextflow run main.nf \
   --input_h5ad data/test.h5ad \
   --tree_json data/lung.json \
-  --llm_model "gemini-1.5-pro" \
+  --llm_model_general "gemini-1.5-flash" \
+  --llm_model_complicated "gemini-1.5-pro" \
   --llm_temperature 0.2 \
   --llm_max_retries 5 \
   --llm_timeout 180
@@ -364,7 +367,8 @@ nextflow run main.nf \
 nextflow run main.nf \
   --input_h5ad data/test.h5ad \
   --tree_json data/lung.json \
-  --llm_model "gemini-1.5-pro" \
+  --llm_model_general "gemini-2.5-flash" \
+  --llm_model_complicated "gemini-1.5-pro" \
   --llm_temperature 0.05 \
   --llm_max_retries 10 \
   --llm_timeout 300 \
@@ -506,7 +510,8 @@ nextflow run main.nf \
 ```bash
 # Verify model name (currently only Gemini supported)
 nextflow run main.nf \
-  --llm_model "gemini-2.0-flash-exp"  # Use exact name
+  --llm_model_general "gemini-2.5-flash" \
+  --llm_model_complicated "gemini-2.5-pro"  # Use exact names
 
 # Check available models in llm_client.py
 ```
@@ -638,7 +643,9 @@ nextflow run main.nf --input_h5ad X --tree_json Y -profile slurm
 
 # Custom LLM
 nextflow run main.nf --input_h5ad X --tree_json Y \
-  --llm_model gemini-1.5-pro --llm_temperature 0.2
+  --llm_model_general gemini-2.5-flash \
+  --llm_model_complicated gemini-1.5-pro \
+  --llm_temperature 0.2
 
 # Test mode
 nextflow run main.nf --input_h5ad X --tree_json Y -profile test
