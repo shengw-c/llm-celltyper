@@ -278,6 +278,19 @@ def annotate_cell_types(
         }, f, indent=2)
     logger.info(f"Saved cluster selection response: {cluster_response_file}")
     
+    if cls_response["resolution"] == 0:
+        ## This is to handle the case where no suitable resolution is found, for now.
+        logger.warning(
+            f"Selected resolution is 0, indicating no further subdivision. "
+            f"Skipping annotation for {nametag}."
+        )
+        adata = sc.read_h5ad(dataset["subset_adata"])
+        cluster_col = f'leiden_{str(cls_response["resolution"]).replace(".", "_")}'
+        df = adata.obs[[cluster_col]].rename(columns={cluster_col: "cluster_id"}).copy()
+        df["ann"] = parent_cell_type if parent_cell_type is not None else "Unknown"
+        hierarchical_collector.add_annotation(nametag, df, current_level)
+        return hierarchical_collector
+    
     ## Prepare input data for annotation
     # Load the adata object once here
     logger.info(f"Loading processed AnnData from {dataset['subset_adata']}")

@@ -70,6 +70,36 @@ class CellTypeAnnotationClient:
         logger.info(f"Initialized Gemini API client with model: {model_name}")
         logger.info(f"Parameters: max_retries={max_retries}, response_mime_type={response_mime_type}")
 
+    def _determineStableResolutions(self, cluster_adjacency_matrix_dict: Dict, transition_cutoff: float, target_number: int) -> List[float]:
+        """
+        Determine stable and substable clustering resolutions based on transition cutoff.
+
+        Args:
+            cluster_adjacency_matrix_dict: Dictionary containing the cluster adjacency matrix data.
+            transition_cutoff: Cutoff value to consider a transition between clusters.
+            target_number: Target number of clusters to achieve.
+
+        Returns:
+            List of two for stable resolutions and substable resolutions.
+        """
+        stables = {}
+        substables = {}
+        for key in cluster_adjacency_matrix_dict.keys():
+            dat = np.array(cluster_adjacency_matrix_dict[key]["data"])
+            split_resolutions = ((dat>=transition_cutoff).sum(1)>1).any()
+            merge_resolutions = ((dat>=transition_cutoff).sum(0)>1).any()
+            if not (split_resolutions or merge_resolutions):
+                if dat.shape[0]>= target_number: 
+                    stables[key] = dat.shape[0]
+            if not merge_resolutions:
+                if dat.shape[0]>= target_number:
+                    substables[key] = dat.shape[0]
+        logger.info(f"""Target number of clusters: {target_number}
+Stable resolutions found: {stables}
+Substable resolutions found: {substables}""")
+        return stables, substables
+
+
     def select_cluster_resolution(self, except_cell_types: int, conditions: int, cluster_adjacency_matrix_dict: Dict, custom_model: str = None, transition_cutoff: float = 0.1) -> Dict:
         """
         Queries the Gemini model to determine the optimal clustering resolution 
@@ -96,25 +126,45 @@ class CellTypeAnnotationClient:
                 ## try to do manual determination before sending to LLM
                 logger.info(f"Try manual determination of cluster resolution")
                 target_num_clusters = min(max(2, len(except_cell_types)) + conditions, max(2, len(except_cell_types)) * 2)
-                stables = {}
-                substables = {}
-                for key in cluster_adjacency_matrix_dict.keys():
-                    dat = np.array(cluster_adjacency_matrix_dict[key]["data"])
-                    split_resolutions = ((dat>=transition_cutoff).sum(1)>1).any()
-                    merge_resoultions = ((dat>=transition_cutoff).sum(0)>1).any()
-                    if not (split_resolutions or merge_resoultions):
-                        if dat.shape[0]>= target_num_clusters: 
-                            stables[key] = dat.shape[0]
-                    if not merge_resoultions:
-                        if dat.shape[0]>= target_num_clusters:
-                            substables[key] = dat.shape[0]
-                valid_stables = {key:value for key, value in stables.items() if value>=target_num_clusters}
-                valid_substables = {key:value for key, value in substables.items() if value>=target_num_clusters}
+                
+                ## Four tiers of criteria:
+                ## 1. stable or substable resolutions meeting target number of clusters (cell types + conditions)
+                ## 2. stable or substable resolutions meeting relaxed target number of clusters (only cell types)
+                ## 3. stable or substable resolutions meeting relaxed transition cutoff (2 * given cutoff, cell types + conditions)
+                ## 4. stable or substable resolutions meeting relaxed transition cutoff (2 * given cutoff, only cell types)
+                ## STOP if any criteria is met
+                ## Raise error if none of the criteria is met
+
+                valid_stables, valid_substables = self._determineStableResolutions(cluster_adjacency_matrix_dict, 
+                                                                      transition_cutoff, 
+                                                                      target_num_clusters)
+                
                 if not valid_stables and not valid_substables:
-                    ## try to relax the target number of clusters
                     logger.info(f"No stable resolutions found meeting target of {target_num_clusters} clusters. Relaxing target criteria to only use {max(2, len(except_cell_types))} clusters.")
-                    valid_stables = {key:value for key, value in stables.items() if value>=max(2, len(except_cell_types))}
-                    valid_substables = {key:value for key, value in substables.items() if value>=max(2, len(except_cell_types))}
+                    valid_stables, valid_substables = self._determineStableResolutions(cluster_adjacency_matrix_dict, 
+                                                                       transition_cutoff, 
+                                                                       max(2, len(except_cell_types)))
+                
+                if not valid_stables and not valid_substables:
+                    logger.info(f"No stable resolutions found meeting target of {max(2, len(except_cell_types))} clusters. Relaxing transition cutoff from {transition_cutoff} to {transition_cutoff * 2}.")
+                    valid_stables, valid_substables = self._determineStableResolutions(cluster_adjacency_matrix_dict, 
+                                                                                       transition_cutoff * 2, 
+                                                                                       target_num_clusters)
+                
+                if not valid_stables and not valid_substables:
+                    logger.info(f"No stable resolutions found meeting target of {max(2, len(except_cell_types))} clusters. Transition cutoff as {transition_cutoff * 2}")
+                    valid_stables, valid_substables = self._determineStableResolutions(cluster_adjacency_matrix_dict, 
+                                                                                       transition_cutoff * 2,
+                                                                                       max(2, len(except_cell_types)))
+                
+                if not valid_stables and not valid_substables:
+                    logger.info(f"No stable resolutions found meeting target.")
+                    logger.info(f"Manual determination failed. Proceeding with LLM query.")
+                    # raise ValueError("Manual determination did not find suitable resolution. Exiting...")
+                    return {
+                        "resolution": 0,
+                        "justification": f"No stable resolutions found meeting target. For safety, returning resolution 0. The cluster will not be further subdivided."
+                    }
 
                 if valid_stables:
                     valid_stables = {float(key.split("_to_")[0].replace("leiden_", "").replace("_", ".")):value for key,value in valid_stables.items()}
@@ -134,45 +184,46 @@ class CellTypeAnnotationClient:
                         "resolution": sel_resolution,
                         "justification": f"Manual determination found substable resolution with {valid_substables[sel_resolution]} clusters, meeting target of {target_num_clusters}."
                     }
-                else:
-                    print("target:", target_num_clusters)
-                    print("stables:", stables)
-                    print("substables:", substables)
-                    logger.info(f"Manual determination failed. Proceeding with LLM query.")
-                    raise ValueError("Manual determination did not find suitable resolution. Exiting...")
-                    prompt = [
-                        cluster_PROMPT.format(
-                            cell_type_num=len(except_cell_types),
-                            condition_num=conditions,
-                            transition_cutoff=transition_cutoff
-                        ),
-                        json.dumps(cluster_adjacency_matrix_dict)
-                    ]
-                    input_token = self.client.models.count_tokens(
-                        model=model_to_use,
-                        contents=prompt
-                    )
-                    logger.info(f"[Cluster determination] Input prompt token count: {input_token.total_tokens}")
-                    cls_res = self.client.models.generate_content(
-                        model=model_to_use,
-                        contents=prompt,
-                        config={
-                            "response_mime_type": self.response_mime_type
-                        }
-                    )
-                    logger.info(f"[Cluster determination] Thinking tokens used: {cls_res.usage_metadata.thoughts_token_count}")
-                    logger.info(f"[Cluster determination] Output tokens used: {cls_res.usage_metadata.candidates_token_count}")
-                    logger.info(f"[Cluster determination] Total tokens used: {cls_res.usage_metadata.total_token_count}")
+                ## comment for now to skip LLM query
+                # else:
+                #     print("target:", target_num_clusters)
+                #     print("stables:", stables)
+                #     print("substables:", substables)
+                #     logger.info(f"Manual determination failed. Proceeding with LLM query.")
+                #     raise ValueError("Manual determination did not find suitable resolution. Exiting...")
+                #     prompt = [
+                #         cluster_PROMPT.format(
+                #             cell_type_num=len(except_cell_types),
+                #             condition_num=conditions,
+                #             transition_cutoff=transition_cutoff
+                #         ),
+                #         json.dumps(cluster_adjacency_matrix_dict)
+                #     ]
+                #     input_token = self.client.models.count_tokens(
+                #         model=model_to_use,
+                #         contents=prompt
+                #     )
+                #     logger.info(f"[Cluster determination] Input prompt token count: {input_token.total_tokens}")
+                #     cls_res = self.client.models.generate_content(
+                #         model=model_to_use,
+                #         contents=prompt,
+                #         config={
+                #             "response_mime_type": self.response_mime_type
+                #         }
+                #     )
+                #     logger.info(f"[Cluster determination] Thinking tokens used: {cls_res.usage_metadata.thoughts_token_count}")
+                #     logger.info(f"[Cluster determination] Output tokens used: {cls_res.usage_metadata.candidates_token_count}")
+                #     logger.info(f"[Cluster determination] Total tokens used: {cls_res.usage_metadata.total_token_count}")
 
-                    # Parse JSON response
-                    result = json.loads(cls_res.text)
+                #     # Parse JSON response
+                #     result = json.loads(cls_res.text)
                     
-                    # Validate required fields
-                    if 'resolution' not in result:
-                        raise ValueError("Response missing required 'resolution' field")
+                #     # Validate required fields
+                #     if 'resolution' not in result:
+                #         raise ValueError("Response missing required 'resolution' field")
                     
-                    logger.info(f"Selected resolution: {result.get('resolution', 'N/A')}")
-                    return result
+                #     logger.info(f"Selected resolution: {result.get('resolution', 'N/A')}")
+                #     return result
                 
             except json.JSONDecodeError as e:
                 logger.warning(f"JSON parsing error (attempt {attempt + 1}/{self.max_retries}): {str(e)}")
