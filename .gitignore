@@ -1,0 +1,134 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Python build directories (but not our source code in bin/lib/)
+/lib/
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+!benchmarks.ipynb
+
+# Pipeline execution directories
+work/
+work_bk/
+results/
+results_*/
+test_logs/
+
+# Log files
+logs/
+*.log
+pipeline_run.log
+
+# Nextflow
+.nextflow/
+.nextflow.log*
+pipeline_info/
+timeline.html
+report.html
+trace.txt
+
+# Data files (keep examples but ignore large datasets)
+data/*.h5ad
+!data/test.h5ad
+data/*.h5
+data/*.csv
+data/*.tsv
+!data/*.json
+*.loom
+
+# Output files
+*.html
+!docs/*.html
+*.png
+*.pdf
+*.svg
+figures/
+responses/
+annotation_summary.html
+
+# Test files and outputs
+test_*.tsv
+test_*.json
+test_consolidated_*
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+.DS_Store
+Thumbs.db
+
+# Copy scripts and examples
+copy_outputs.sh
+example_use_*.py
+test_aggregation.sh
+
+# Backup directories
+*_bk/
+backup/
+
+# API keys and secrets
+.env.local
+.env.production
+secrets.txt
+api_keys.txt
+
+# Slurm files
+slurm-*.out
+*.sbatch
+
+# Conda/Mamba environments
+.conda/
+.mamba/
+
+# Cache directories
+.cache/
+.pytest_cache/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# Big file
+data/test_large.h5ad
+data/mouse_embryo_*
