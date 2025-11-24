@@ -6,13 +6,13 @@ Nextflow pipeline for hierarchical cell type annotation of single-cell RNA-seq d
 
 This pipeline performs automated, hierarchical cell type annotation on single-cell RNA-seq data using:
 - Iterative clustering with automatic resolution optimization
-- **Random 6-character alphanumeric cluster IDs** for privacy and traceability
+- Random 6-character alphanumeric cluster IDs for privacy and traceability
 - LLM-based cell type identification
 - Marker gene and pathway enrichment analysis
 - Hierarchical annotation tracking across multiple levels
 - Complete lineage tracking for all clusters
 
-## New Feature: Random Cluster IDs
+## Random Cluster IDs
 
 The pipeline now assigns **random 6-character alphanumeric IDs** (e.g., `A3X9K2`, `B7M4N1`) to clusters instead of sequential numeric IDs. This provides:
 
@@ -56,6 +56,10 @@ cluster_id,iteration,parent_id,depth,lineage
 A3X9K2,1,,0,A3X9K2
 B7M4N1,2,A3X9K2,1,A3X9K2 → B7M4N1
 ```
+
+## A quick comparison against expert annotation using mouse embryo altas
+
+![fig](./figures/LLM_vs_Expert.png)
 
 ## Quick Start
 
