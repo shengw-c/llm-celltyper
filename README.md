@@ -1,6 +1,6 @@
 # Cell Type Annotation Pipeline v2
 
-Nextflow pipeline for hierarchical cell type annotation of single-cell RNA-seq data using LLM-based iterative annotation with **random cluster ID tracking**.
+Nextflow pipeline for hierarchical cell type annotation of single-cell RNA-seq data using LLM-based iterative annotation with random cluster ID tracking.
 
 ## Overview
 
@@ -74,7 +74,7 @@ B7M4N1,2,A3X9K2,1,A3X9K2 → B7M4N1
 
 ```bash
 # Clone the repository
-cd /home/sheng/projects/llm_celltyper_v2
+cd /home/sheng/projects/llm-celltyper
 
 # Set up Python environment (if needed)
 # Install dependencies from requirements.txt
@@ -303,20 +303,8 @@ Solution: Adjust `--max_resolution` or `--transition_cutoff` parameters
 
 ## Architecture
 
-This pipeline uses the **v2 iterative architecture**:
+This pipeline uses the **iterative architecture**:
 - Processes the entire dataset in a single workflow
 - Uses iterative deepening for hierarchical annotation
-- No tree-based splitting (unlike v1)
+- No tree-based splitting
 - Automatic determination of annotation levels based on split decisions
-
-## Citation
-
-If you use this pipeline, please cite [your publication here].
-
-## License
-
-[Your license here]
-
-## Contact
-
-For questions or issues, please contact [your contact info].
