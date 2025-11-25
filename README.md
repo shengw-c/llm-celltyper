@@ -66,7 +66,7 @@ B7M4N1,2,A3X9K2,1,A3X9K2 → B7M4N1
 ### Prerequisites
 
 - Nextflow (>= 21.04.0)
-- Python 3.8+
+- Python 3.13+
 - Required Python packages (install via pip or conda)
 - Google API key for Gemini models (if not using mock mode)
 
@@ -74,10 +74,11 @@ B7M4N1,2,A3X9K2,1,A3X9K2 → B7M4N1
 
 ```bash
 # Clone the repository
-cd /home/sheng/projects/llm_celltyper_v2
+cd /home/sheng/projects/llm_celltyper
 
 # Set up Python environment (if needed)
 # Install dependencies from requirements.txt
+# Run bash check_setup.sh to make sure everything works
 
 # Set Google API key (if using real LLM)
 export GOOGLE_API_KEY="your-api-key-here"
@@ -125,8 +126,7 @@ nextflow run main.nf \
 #### LLM Configuration
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `--llm_model_general` | "gemini-2.5-flash" | LLM model for general tasks |
-| `--llm_model_complicated` | "gemini-2.5-pro" | LLM model for complex tasks |
+| `--llm_model` | "gemini-2.5-flash" | LLM model for annotation and harmonization |
 | `--llm_max_retries` | 3 | Maximum retries for LLM API calls |
 | `--mock_llm` | false | **Enable mock mode (no API calls)** |
 
@@ -206,12 +206,14 @@ results/
 │   │   ├── iter1_cluster_data.json
 │   │   ├── iter2_cluster_data.json
 │   │   ├── ...
+│   │   ├── hierarchical_annotation_complete.csv
 │   │   ├── cluster_id_mappings.json      # Complete ID tracking with metadata
 │   │   └── cluster_id_lineage.csv        # Human-readable lineage table
+│   ├── annotated_data.h5ad               # Final annotated h5ad with all layers
 │   ├── responses/
 │   │   └── cell_annotation.json
 │   └── figures/
-│       ├── umap_iter1.png
+│       ├── umap_harmonized_celltypes.png
 │       └── ...
 ├── logs/
 │   ├── annotator_*.log
@@ -225,8 +227,11 @@ results/
 ### Key Output Files
 
 - **hierarchical_annotation_complete.csv**: Final cell type annotations with hierarchical structure
+- **annotated_data.h5ad**: Complete AnnData object with all annotation layers in obs (NEW!)
 - **cell_annotation.json**: LLM annotation responses for all iterations
 - **iter*_cluster_data.json**: Cluster information (markers, pathways) for each iteration
+- **cluster_id_mappings.json**: Complete cluster ID tracking with metadata and lineage
+- **cluster_id_lineage.csv**: Human-readable lineage table
 - **pipeline_report.html**: Nextflow execution report
 
 ## Pipeline Workflow
@@ -264,7 +269,7 @@ nextflow run main.nf \
   --cpus 32 \
   --min_cells 1000 \
   --max_resolution 1.5 \
-  --llm_model_general "gemini-2.5-flash" \
+  --llm_model "gemini-2.5-pro" \
   --outdir results/lung_annotation \
   -profile slurm
 ```

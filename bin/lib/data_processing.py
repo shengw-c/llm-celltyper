@@ -14,8 +14,6 @@ import seaborn as sns
 import colorcet as cc
 from tqdm import tqdm
 from tqdm import TqdmWarning
-from pyclustree import clustree
-import base64
 import os
 import warnings
 
@@ -613,13 +611,6 @@ Substable resolutions found: {substables}""")
             'has_harmonized_labels': 'harmonized_cell_type' in annotation_cols,
             'annotation_columns': annotation_cols
         }
-        
-        # Write the annotated h5ad file
-        logger.info(f"Writing annotated h5ad to: {output_file}")
-        self.current_adata.write_h5ad(output_file)
-        
-        logger.info(f"Successfully exported annotated h5ad with {len(annotation_cols)} annotation columns")
-        logger.info(f"File size: {os.path.getsize(output_file) / 1e9:.2f} GB")
         
         # Write the annotated h5ad file
         logger.info(f"Writing annotated h5ad to: {output_file}")

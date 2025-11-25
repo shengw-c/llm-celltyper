@@ -45,7 +45,7 @@ def helpMessage() {
       --min_cells INT         Min cells for subtype annotation (default: 1000)
       
       LLM Configuration:
-      --llm_model STRING       LLM model for annotation and harmonization (default: gemini-2.5-pro)
+      --llm_model STRING       LLM model for annotation and harmonization (default: gemini-2.5-flash)
       --llm_max_retries INT    Maximum retries for LLM API calls (default: 3)
       --mock_llm               Enable mock LLM mode for testing (no API calls)
       
@@ -143,6 +143,7 @@ process ANNOTATE_CELL_TYPES {
     publishDir "${params.outdir}/annotation/", mode: 'copy', pattern: "responses/*.json"
     publishDir "${params.outdir}/annotation/", mode: 'copy', pattern: "figures/*.png"
     publishDir "${params.outdir}/annotation/", mode: 'copy', pattern: "data/*.{tsv,csv}"
+    publishDir "${params.outdir}/annotation/", mode: 'copy', pattern: "annotated_data.h5ad"
     publishDir "${params.outdir}/logs/", mode: 'copy', pattern: "logs/*.log"
     
     input:
@@ -154,6 +155,7 @@ process ANNOTATE_CELL_TYPES {
     path "data/*.tsv", emit: tsv_files, optional: true
     path "data/*.csv", emit: csv_files, optional: true
     path "data/hierarchical_annotation_complete.csv", emit: final_annotations, optional: true
+    path "annotated_data.h5ad", emit: annotated_h5ad, optional: true
     path "logs/*.log", emit: logs, optional: true
     
     script:
@@ -214,6 +216,7 @@ workflow.onComplete {
     Duration            : ${workflow.duration}
     Results dir         : ${params.outdir}
     Final annotations   : ${params.outdir}/annotation/data/hierarchical_annotation_complete.csv
+    Annotated h5ad      : ${params.outdir}/annotation/annotated_data.h5ad
     Responses           : ${params.outdir}/annotation/responses/
     Figures             : ${params.outdir}/annotation/figures/
     ============================================================================
